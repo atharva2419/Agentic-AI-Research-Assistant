@@ -49,12 +49,26 @@ class LLMError(Exception):
 
 
 class StructuredOutputError(Exception):
-    """The model kept returning output that failed validation."""
+    """The model kept returning output that failed validation.
 
-    def __init__(self, step: str, attempts: int, errors: list[str]) -> None:
+    `last_valid_shape` is the last answer that matched the schema but failed the semantic checks
+    (None if no answer even matched the schema). Callers may use it to degrade gracefully, e.g.
+    keep a report but flag its unsupported statements.
+    """
+
+    def __init__(
+        self,
+        step: str,
+        attempts: int,
+        errors: list[str],
+        last_valid_shape: BaseModel | None = None,
+        responses: list["LLMResponse"] | None = None,
+    ) -> None:
         self.step = step
         self.attempts = attempts
         self.errors = errors
+        self.last_valid_shape = last_valid_shape
+        self.responses = responses or []
         super().__init__(f"step '{step}' failed validation after {attempts} attempts: {errors}")
 
 
@@ -93,6 +107,7 @@ async def structured_call[T: BaseModel](
     messages = list(request.messages)
     responses: list[LLMResponse] = []
     errors: list[str] = []
+    last_valid_shape: T | None = None
 
     for attempt in range(1, max_retries + 2):
         current = LLMRequest(
@@ -115,6 +130,7 @@ async def structured_call[T: BaseModel](
             errors = validate(value) if validate else []
             if not errors:
                 return StructuredResult(value=value, attempts=attempt, responses=responses)
+            last_valid_shape = value
 
         messages = [
             *messages,
@@ -129,4 +145,10 @@ async def structured_call[T: BaseModel](
             ),
         ]
 
-    raise StructuredOutputError(step=request.step, attempts=len(responses), errors=errors)
+    raise StructuredOutputError(
+        step=request.step,
+        attempts=len(responses),
+        errors=errors,
+        last_valid_shape=last_valid_shape,
+        responses=responses,
+    )

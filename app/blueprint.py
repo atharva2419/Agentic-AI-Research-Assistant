@@ -57,6 +57,7 @@ class Limits(StrictModel):
     search_timeout_s: float = Field(gt=0)
     llm_timeout_s: float = Field(gt=0)
     parallel_searches: int = Field(ge=1)
+    parallel_llm_calls: int = Field(ge=1)
 
 
 class FilteringConfig(StrictModel):

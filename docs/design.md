@@ -176,7 +176,11 @@ class Orchestrator:
 
 - `step()` does **one unit**: one LLM call for clarify/plan/gap-check/synthesize, or **one batch of
   ready sub-tasks** while executing. Ready searches in a batch run **in parallel** (bounded by a
-  semaphore). Between units, the driver checks for user commands, so overrides apply quickly.
+  semaphore), as do per-source summaries. Between units, the driver checks for user commands, so
+  overrides apply quickly.
+- **Parallel I/O, sequential state changes:** slow calls (web searches, LLM calls) run concurrently;
+  their results are then applied to the session one at a time in plan order. Source IDs and the
+  action log come out in the same order on every run, which keeps tests deterministic.
 - **Drivers** own the waiting, not the orchestrator:
   - the **CLI** driver loops `step()`, and in an `AWAITING_*` state it prompts in the terminal;
   - the **API** driver (`SessionRunner`) loops `step()` in a background asyncio task and in an
@@ -217,7 +221,10 @@ last.
 The plan is checked in code before anything runs. A failure goes back to the LLM as an error message
 in the retry loop (section 7.2), the same way a JSON schema error does.
 
-- sub-task IDs unique; every `depends_on` points to an existing ID; **no cycles** (topological sort);
+- sub-task IDs unique; every `depends_on` points to an existing ID;
+- dependencies are **layered by type**: searches depend on nothing, `summarize` only on searches,
+  `cross_check` only on summarize tasks. This makes cycles impossible by construction, so no cycle
+  detection is needed;
 - types are in the blueprint's allowed list; `search` tasks have a non-empty query;
 - `summarize` depends on at least one `search`; `cross_check` depends on at least one `summarize`;
 - at least one `search`; total sub-tasks ≤ `max_subtasks`; searches ≤ remaining search budget;
@@ -297,9 +304,8 @@ small and stops the LLM from making up state.
 
 | Step | Model | Effort | Why |
 |---|---|---|---|
-| plan | `claude-opus-5-5` | medium | Hardest reasoning; one call per session |
 | synthesize | `claude-opus-5-5` | medium | Quality of the final report matters most |
-| clarify, gap_check, cross_check | `claude-sonnet-5-5` | low/medium | Judgment calls, one per stage, half Opus's price |
+| plan, clarify, gap_check, cross_check | `claude-sonnet-5-5` | low/medium | Judgment calls, one per stage, half Opus's price. Planning output is validated in code, so a strong mid-tier model is enough |
 | relevance, summarize | `claude-haiku-5-5` | low | High volume (per source), simple tasks, very cheap |
 
 Rule of thumb: **one call per stage → stronger model; one call per source → cheapest model.**
@@ -516,12 +522,12 @@ One full session (~12 searches, ~15 sources summarized), roughly:
 
 | Part | Calls | Est. cost |
 |---|---|---|
-| Plan + synthesis (Opus, incl. thinking) | 2 | ~$0.10–0.15 |
-| Clarify + gap check + cross-check (Sonnet) | 3–5 | ~$0.04–0.08 |
+| Synthesis (Opus, incl. thinking) | 1 | ~$0.06–0.10 |
+| Plan + clarify + gap check + cross-check (Sonnet) | 4–6 | ~$0.05–0.10 |
 | Relevance + summaries (Haiku) | ~20 | ~$0.01–0.02 |
-| **Total** | | **~$0.15–0.25** |
+| **Total** | | **~$0.12–0.20** |
 
-**$5 ≈ 20–30 full live runs.** Plan: build and test entirely with fakes (free); use
+**$5 ≈ 25–40 full live runs.** Plan: build and test entirely with fakes (free); use
 `LLM_MODEL_OVERRIDE=claude-haiku-5-5` for smoke tests (~$0.01–0.02 each); save full Opus runs for
 prompt tuning, the eval (~$1.5 for 6–8 topics) and demo rehearsal. The real cost of each session is
 logged, so these estimates get replaced with measured numbers.

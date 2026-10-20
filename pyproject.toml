@@ -5,9 +5,12 @@ description = "Agentic AI personal research assistant: plans, searches, filters,
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=1.16.0",
+    "httpx>=0.28.1",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
     "pyyaml>=6.0.3",
+    "rich>=15.0.0",
 ]
 
 [dependency-groups]
@@ -50,6 +53,12 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 files = ["app", "tests"]
+
+[[tool.mypy.overrides]]
+# Tests assert a status, await the orchestrator, then assert a different status. mypy's
+# strict_equality assumes the attribute can't change across the await and flags it.
+module = "tests.*"
+strict_equality = false
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

@@ -23,6 +23,10 @@ class FakeLLM:
     def add(self, step: str, *responses: ScriptedResponse) -> None:
         self._script.setdefault(step, []).extend(responses)
 
+    def set(self, step: str, *responses: ScriptedResponse) -> None:
+        """Replace the queued responses for a step."""
+        self._script[step] = list(responses)
+
     def calls_for(self, step: str) -> list[LLMRequest]:
         return [c for c in self.calls if c.step == step]
 

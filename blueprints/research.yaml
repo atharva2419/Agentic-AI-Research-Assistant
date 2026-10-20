@@ -25,7 +25,7 @@ pricing:
 # one call per source -> cheapest model.
 steps:
   clarify:     { prompt: clarify.md,     model: balanced, effort: low,    max_tokens: 4000 }
-  plan:        { prompt: plan.md,        model: strong,   effort: medium, max_tokens: 16000 }
+  plan:        { prompt: plan.md,        model: balanced, effort: medium, max_tokens: 16000 }
   relevance:   { prompt: relevance.md,   model: fast,     effort: low,    max_tokens: 4000 }
   summarize:   { prompt: summarize.md,   model: fast,     effort: low,    max_tokens: 4000 }
   cross_check: { prompt: cross_check.md, model: balanced, effort: medium, max_tokens: 8000 }
@@ -52,6 +52,7 @@ limits:
   search_timeout_s: 20
   llm_timeout_s: 120
   parallel_searches: 3
+  parallel_llm_calls: 4
 
 filtering:
   default_recency_days: 365

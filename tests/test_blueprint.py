@@ -19,13 +19,14 @@ def raw_blueprint() -> dict[str, Any]:
 def test_real_blueprint_loads() -> None:
     blueprint = load_blueprint(BLUEPRINT_PATH)
     assert blueprint.name == "research"
-    assert blueprint.model_id("plan") == "claude-opus-5-5"
+    assert blueprint.model_id("plan") == "claude-sonnet-5-5"
+    assert blueprint.model_id("synthesize") == "claude-opus-5-5"
     assert blueprint.model_id("summarize") == "claude-haiku-5-5"
 
 
 def test_model_override_wins() -> None:
     blueprint = load_blueprint(BLUEPRINT_PATH)
-    assert blueprint.model_id("plan", override="claude-haiku-5-5") == "claude-haiku-5-5"
+    assert blueprint.model_id("synthesize", override="claude-haiku-5-5") == "claude-haiku-5-5"
 
 
 def test_cost_estimate() -> None:
