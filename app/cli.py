@@ -3,8 +3,9 @@
     uv run python -m app.cli "impact of AI on journalism"
     uv run python -m app.cli "EV battery recycling" --mode autonomous --recency-days 180
 
-Needs ANTHROPIC_API_KEY and TAVILY_API_KEY in .env. Set LLM_MODEL_OVERRIDE=claude-haiku-5-5 for a
-cheap smoke run. The session JSON and the report are saved under data/.
+Needs ANTHROPIC_API_KEY and TAVILY_API_KEY in .env (or --offline for the free demo mode). Set
+LLM_MODEL_OVERRIDE=claude-haiku-5-5 for a cheap smoke run. The session JSON and the report are
+saved under data/.
 """
 
 import argparse
@@ -16,9 +17,7 @@ from rich.markdown import Markdown
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from app.blueprint import load_blueprint
-from app.config import PROJECT_ROOT, Settings, get_settings
-from app.llm.anthropic_client import AnthropicLLMClient
+from app.config import PROJECT_ROOT, get_settings
 from app.models import (
     ActionLogEntry,
     Actor,
@@ -29,37 +28,12 @@ from app.models import (
     SessionSettings,
     Status,
 )
-from app.orchestrator.deps import AgentDeps
 from app.orchestrator.orchestrator import Orchestrator
-from app.prompts import PromptLibrary
 from app.report_render import report_to_markdown
-from app.search.tavily_client import TavilySearchClient
+from app.wiring import MissingKeys, build_wiring
 
 console = Console()
 ACTOR_STYLE = {Actor.AGENT: "cyan", Actor.USER: "magenta", Actor.SYSTEM: "dim"}
-
-
-def build_deps(settings: Settings) -> tuple[AgentDeps, TavilySearchClient]:
-    if settings.anthropic_api_key is None or settings.tavily_api_key is None:
-        console.print("[red]Set ANTHROPIC_API_KEY and TAVILY_API_KEY in .env first.[/red]")
-        sys.exit(1)
-    blueprint = load_blueprint(settings.blueprint_path)
-    search = TavilySearchClient(
-        api_key=settings.tavily_api_key.get_secret_value(),
-        timeout_s=blueprint.limits.search_timeout_s,
-        depth=blueprint.search.depth,
-    )
-    deps = AgentDeps(
-        llm=AnthropicLLMClient(
-            api_key=settings.anthropic_api_key.get_secret_value(),
-            timeout_s=blueprint.limits.llm_timeout_s,
-        ),
-        search=search,
-        blueprint=blueprint,
-        prompts=PromptLibrary(settings.prompts_dir),
-        model_override=settings.llm_model_override,
-    )
-    return deps, search
 
 
 class LogPrinter:
@@ -131,9 +105,16 @@ def save_outputs(session: ResearchSession) -> None:
     )
 
 
-async def run(topic: str, mode: Mode, recency_days: int) -> None:
+async def run(topic: str, mode: Mode, recency_days: int, offline: bool = False) -> None:
     settings = get_settings()
-    deps, search = build_deps(settings)
+    try:
+        wiring = build_wiring(settings, offline=offline or None)
+    except MissingKeys as exc:
+        console.print(f"[red]{exc}[/red]")
+        sys.exit(1)
+    deps = wiring.deps
+    if wiring.offline:
+        console.print("[yellow]Offline demo mode: generated sources and answers, no cost.[/yellow]")
     orchestrator = Orchestrator(deps)
     session = ResearchSession(
         user_id="cli",
@@ -163,7 +144,7 @@ async def run(topic: str, mode: Mode, recency_days: int) -> None:
             else:
                 break
     finally:
-        await search.aclose()
+        await wiring.close()
         save_outputs(session)
 
     if session.status == Status.DONE:
@@ -183,8 +164,9 @@ def main() -> None:
     parser.add_argument("topic", help="what to research")
     parser.add_argument("--mode", choices=[m.value for m in Mode], default=Mode.SUPERVISED.value)
     parser.add_argument("--recency-days", type=int, default=365)
+    parser.add_argument("--offline", action="store_true", help="free demo mode, no API keys")
     args = parser.parse_args()
-    asyncio.run(run(args.topic, Mode(args.mode), args.recency_days))
+    asyncio.run(run(args.topic, Mode(args.mode), args.recency_days, args.offline))
 
 
 if __name__ == "__main__":

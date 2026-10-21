@@ -6,8 +6,7 @@ from datetime import date
 
 from app.blueprint import load_blueprint
 from app.config import PROJECT_ROOT
-from app.llm.base import LLMRequest
-from app.llm.fake import FakeLLM
+from app.llm.base import LLMClient, LLMRequest
 from app.models import Mode, ResearchSession, SearchMode, SubTaskType
 from app.orchestrator.deps import AgentDeps
 from app.orchestrator.steps.clarify import ClarifyOutput
@@ -19,15 +18,14 @@ from app.orchestrator.steps.search import RelevanceJudgment, RelevanceOutput
 from app.orchestrator.steps.summarize import QuoteOutput, SummaryOutput
 from app.orchestrator.steps.synthesize import CitedClaim, SectionOutput, SynthesisOutput
 from app.prompts import PromptLibrary
-from app.search.base import SearchResult
-from app.search.fake import FakeSearch
+from app.search.base import SearchClient, SearchResult
 
 TODAY = date(2026, 10, 20)
 BLUEPRINT = load_blueprint(PROJECT_ROOT / "blueprints" / "research.yaml")
 LONG_TEXT = "Newsrooms are adopting AI tools for transcription and research. " * 10
 
 
-def make_deps(llm: FakeLLM, search: FakeSearch) -> AgentDeps:
+def make_deps(llm: LLMClient, search: SearchClient) -> AgentDeps:
     return AgentDeps(
         llm=llm,
         search=search,

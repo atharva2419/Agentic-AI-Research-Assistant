@@ -428,15 +428,26 @@ human overrides. **Autonomous mode** runs start to finish with no prompts (answe
 | GET | `/api/users/{user_id}/suggestions` | Related topics from memory |
 | GET | `/api/blueprint` | The active blueprint (shown in the UI's "How it works" panel) |
 
-SSE event types: `status_changed`, `log_entry`, `questions`, `plan_updated`, `subtask_updated`,
-`source_updated`, `report_ready`, `error`. Each event has an increasing `id`, so a reconnecting browser
-sends `Last-Event-ID` and gets only what it missed.
+Also: `GET /api/health` (reports offline mode) and `GET /api/sessions/{id}/report.md` (download).
+
+SSE has just **two event types**: `snapshot` (the whole session minus page text) and `log` (one new
+action-log entry, pushed the moment it is written through a listener hook on the session). Every
+connection starts with a snapshot, and a snapshot follows every step and command. A reconnecting
+browser therefore just gets the current state again: no event IDs or replay buffer are needed.
+Trade-off: snapshots resend the whole session (tens of KB), which is fine for one user per session.
+
+**Offline demo mode** (`OFFLINE_MODE=true`): a built-in fake LLM and fake search that produce valid
+output for any topic (it passes every validator), with small delays so the UI looks live. Used for
+UI development, API tests, and as a fallback if an API fails during a live demo.
 
 **Why SSE and not WebSockets:** data flows mostly server → browser; commands are ordinary REST calls.
 SSE is plain HTTP, reconnects automatically, and is simpler to test.
 
-**SessionRunner:** one asyncio background task per active session in the FastAPI process, with an
-`asyncio.Queue` for commands and an in-process event bus for SSE subscribers. Trade-off: single process
+**SessionRunner:** one asyncio background task per active session in the FastAPI process. It loops
+`step()` and sleeps on an `asyncio.Event` while the session waits for the user. Commands are
+applied by the request handler under a per-session lock (so they land between steps, never inside
+one); pause/resume only flip a flag and skip the lock. An in-process event bus fans events out to
+SSE subscribers. Trade-off: single process
 only. In production this would be a worker queue (for example SQS + workers) with events in Redis or
 Postgres LISTEN/NOTIFY. Stated in the README.
 

@@ -4,12 +4,13 @@ These are the agent's state. LLM output schemas are separate and smaller (they l
 step), so the LLM never fills in IDs, statuses or timestamps — code does.
 """
 
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 
 def utc_now() -> datetime:
@@ -284,6 +285,13 @@ class ResearchSession(DomainModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
+    # Called with each new log entry (the API streams entries live). Not part of the data:
+    # private attributes are never serialized or compared.
+    _log_listener: Callable[[ActionLogEntry], None] | None = PrivateAttr(default=None)
+
+    def set_log_listener(self, listener: Callable[[ActionLogEntry], None] | None) -> None:
+        self._log_listener = listener
+
     def get_source(self, source_id: str) -> Source | None:
         return next((s for s in self.sources if s.id == source_id), None)
 
@@ -313,6 +321,8 @@ class ResearchSession(DomainModel):
             details=details or {},
         )
         self.log.append(entry)
+        if self._log_listener is not None:
+            self._log_listener(entry)
         return entry
 
 

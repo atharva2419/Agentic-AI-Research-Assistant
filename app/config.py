@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     tavily_api_key: SecretStr | None = None
     database_url: str = f"sqlite:///{PROJECT_ROOT / 'data' / 'research.db'}"
     llm_model_override: str | None = None
+    # Built-in fake AI and search: no API keys, no cost. For UI work and as a demo fallback.
+    offline_mode: bool = False
     log_level: str = "INFO"
     blueprint_path: Path = PROJECT_ROOT / "blueprints" / "research.yaml"
     prompts_dir: Path = PROJECT_ROOT / "prompts"
