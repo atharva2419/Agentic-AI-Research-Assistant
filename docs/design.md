@@ -460,7 +460,7 @@ Postgres LISTEN/NOTIFY. Stated in the README.
 | Max searches per session | 12 |
 | Max replans | 2 |
 | Max clarifying questions | 3 (+1 from gap check) |
-| Max sources summarized | 15 |
+| Max sources summarized | 15, shared across summarize tasks in proportion to their searches; each search's most relevant sources first |
 | Max LLM spend per session | $0.75 (estimated; synthesis is forced if reached) |
 | LLM retries on invalid output | 2 |
 | Timeouts | search 20 s, LLM 120 s |
