@@ -44,10 +44,13 @@ limits:
   max_subtasks: 10
   max_searches: 12
   max_replans: 2
+  max_new_searches_per_replan: 3
   max_clarifying_questions: 3
   max_gap_questions: 1
-  max_sources_summarized: 15
-  max_cost_usd: 0.75
+  max_sources_summarized: 18
+  summary_reserve_for_replans: 4 # slots the first plan can't use, kept for replan sources
+  max_cost_usd: 0.75 # soft cap: past it, pending searches are skipped; the report is always written
+  replan_cost_ceiling_usd: 0.45 # no replans once a session has spent this much
   llm_max_retries: 2
   search_timeout_s: 20
   llm_timeout_s: 120

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.llm.base import LLMError, StructuredOutputError
 from app.models import (
     Actor,
+    Origin,
     Quote,
     ResearchSession,
     Source,
@@ -104,7 +105,11 @@ def sources_to_summarize(
 async def run_summarize(deps: AgentDeps, session: ResearchSession, task: SubTask) -> None:
     task.status = SubTaskStatus.RUNNING
     limits = deps.blueprint.limits
-    sources, skipped = sources_to_summarize(session, task, limits.max_sources_summarized)
+    # The first plan can't use the reserve; it's kept for sources that replans find.
+    max_total = limits.max_sources_summarized
+    if task.origin == Origin.PLANNER:
+        max_total -= limits.summary_reserve_for_replans
+    sources, skipped = sources_to_summarize(session, task, max_total)
     semaphore = asyncio.Semaphore(limits.parallel_llm_calls)
     content_limit = deps.blueprint.filtering.summarize_content_chars
 
@@ -177,8 +182,8 @@ async def run_summarize(deps: AgentDeps, session: ResearchSession, task: SubTask
             action=f"skipped {len(skipped)} source(s): {listed}",
             decision=f"this task's share of the summary budget was {len(sources)}",
             reason=(
-                f"limit is {limits.max_sources_summarized} summaries per session, shared fairly "
-                "across summarize tasks; the most relevant source of each search is picked first"
+                f"limit is {max_total} summaries for this plan, shared fairly across summarize "
+                "tasks; the most relevant source of each search is picked first"
             ),
             details={"subtask_id": task.id, "skipped": [s.id for s in skipped]},
         )

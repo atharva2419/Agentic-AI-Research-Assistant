@@ -139,14 +139,20 @@ stateDiagram-v2
     EXECUTING --> GAP_CHECK: all_tasks_done
     GAP_CHECK --> EXECUTING: replan [replans left]
     GAP_CHECK --> AWAITING_ANSWERS: needs_user [questions left]
+    AWAITING_ANSWERS --> GAP_CHECK: gap_answer_received
     GAP_CHECK --> SYNTHESIZING: sufficient / budget exhausted
     SYNTHESIZING --> DONE: report_ready
     DONE --> [*]
 ```
 
-Any state can go to `FAILED` on an unrecoverable error. After a gap-check question is answered,
-`AWAITING_ANSWERS → PLANNING` produces a **revised plan** that keeps completed work (the plan has a
-version number).
+Any state can go to `FAILED` on an unrecoverable error. After a **gap-check** question is
+answered, the session goes back to `GAP_CHECK` (not `PLANNING`): the coverage review runs again with
+the answer in context and can replan from there, so finished work is kept. Opening questions go to
+`PLANNING` as usual.
+
+**Questions in autonomous mode:** the clarify step still runs, but the agent doesn't wait. Each
+question's `assumption_if_skipped` becomes a stated assumption, logged and carried into every prompt
+and the report. The gap check may not choose `needs_user` in autonomous mode.
 
 The transition function is **pure** and table-driven:
 
@@ -458,10 +464,11 @@ Postgres LISTEN/NOTIFY. Stated in the README.
 |---|---|
 | Max sub-tasks per plan | 10 |
 | Max searches per session | 12 |
-| Max replans | 2 |
-| Max clarifying questions | 3 (+1 from gap check) |
-| Max sources summarized | 15, shared across summarize tasks in proportion to their searches; each search's most relevant sources first |
-| Max LLM spend per session | $0.75 (estimated; synthesis is forced if reached) |
+| Max replans | 2, each adding at most 3 searches |
+| Max clarifying questions | 3 (+1 from gap check, supervised mode only) |
+| Max sources summarized | 18, of which 4 are reserved for replan sources; shared across summarize tasks in proportion to their searches; each search's most relevant sources first |
+| Replan cost ceiling | $0.45: no replans past it, so money is left for the report |
+| Max LLM spend per session | $0.75 soft cap: pending searches are skipped; summaries and the report still run |
 | LLM retries on invalid output | 2 |
 | Timeouts | search 20 s, LLM 120 s |
 

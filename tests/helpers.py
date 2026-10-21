@@ -10,8 +10,11 @@ from app.llm.base import LLMRequest
 from app.llm.fake import FakeLLM
 from app.models import Mode, ResearchSession, SearchMode, SubTaskType
 from app.orchestrator.deps import AgentDeps
+from app.orchestrator.steps.clarify import ClarifyOutput
 from app.orchestrator.steps.cross_check import CrossCheckOutput
+from app.orchestrator.steps.gap_check import GapCheckOutput
 from app.orchestrator.steps.plan import PlannedQuestion, PlannedSubTask, PlanOutput
+from app.orchestrator.steps.questions import QuestionOutput
 from app.orchestrator.steps.search import RelevanceJudgment, RelevanceOutput
 from app.orchestrator.steps.summarize import QuoteOutput, SummaryOutput
 from app.orchestrator.steps.synthesize import CitedClaim, SectionOutput, SynthesisOutput
@@ -170,3 +173,20 @@ def synthesis_citing(source_ids: list[str]) -> SynthesisOutput:
 
 
 NO_CONTRADICTIONS = CrossCheckOutput(contradictions=[])
+CLEAR_TOPIC = ClarifyOutput(is_ambiguous=False, reasoning="Specific enough.", questions=[])
+SUFFICIENT = GapCheckOutput(
+    verdict="sufficient",
+    reasoning="Both questions covered.",
+    gaps=[],
+    new_searches=[],
+    question=None,
+)
+
+
+def question(text: str = "Which region?", assume: str = "Global coverage") -> QuestionOutput:
+    return QuestionOutput(
+        question=text,
+        why_it_matters="Changes which sources matter.",
+        suggested_options=["US", "EU", "Global"],
+        assumption_if_skipped=assume,
+    )

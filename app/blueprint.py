@@ -49,10 +49,13 @@ class Limits(StrictModel):
     max_subtasks: int = Field(ge=1)
     max_searches: int = Field(ge=1)
     max_replans: int = Field(ge=0)
+    max_new_searches_per_replan: int = Field(ge=1)
     max_clarifying_questions: int = Field(ge=0)
     max_gap_questions: int = Field(ge=0)
     max_sources_summarized: int = Field(ge=1)
+    summary_reserve_for_replans: int = Field(ge=0)
     max_cost_usd: float = Field(gt=0)
+    replan_cost_ceiling_usd: float = Field(gt=0)
     llm_max_retries: int = Field(ge=0, le=5)
     search_timeout_s: float = Field(gt=0)
     llm_timeout_s: float = Field(gt=0)
@@ -95,6 +98,10 @@ class Blueprint(StrictModel):
             raise ValueError(f"no pricing for models: {unpriced}")
         if SubTaskType.SEARCH not in self.allowed_subtask_types:
             raise ValueError("allowed_subtask_types must include 'search'")
+        if self.limits.summary_reserve_for_replans >= self.limits.max_sources_summarized:
+            raise ValueError("summary_reserve_for_replans must be below max_sources_summarized")
+        if self.limits.replan_cost_ceiling_usd > self.limits.max_cost_usd:
+            raise ValueError("replan_cost_ceiling_usd must not exceed max_cost_usd")
         return self
 
     def model_id(self, step: StepName, override: str | None = None) -> str:

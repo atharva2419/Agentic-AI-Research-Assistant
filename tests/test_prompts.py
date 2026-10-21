@@ -13,7 +13,9 @@ Here is {{thing}} with JSON like {"a": 1}.
 
 # The values each step passes to its prompt. Keeps prompt files and code in sync.
 EXPECTED_PLACEHOLDERS = {
+    "clarify.md": {"context", "max_questions"},
     "plan.md": {"context", "allowed_types", "max_subtasks", "max_searches"},
+    "gap_check.md": {"context", "coverage", "options"},
     "relevance.md": {"context", "research_questions", "search_purpose", "sources"},
     "summarize.md": {"context", "research_questions", "source"},
     "cross_check.md": {"context", "focus", "summaries"},
@@ -49,9 +51,8 @@ def test_real_prompt_files_match_the_code(filename: str, expected: set[str]) -> 
     assert template.system and template.user
 
 
-def test_blueprint_points_at_these_prompts() -> None:
-    for step in ("plan", "relevance", "summarize", "cross_check", "synthesize"):
-        assert BLUEPRINT.steps[step].prompt in EXPECTED_PLACEHOLDERS
+def test_every_blueprint_step_has_a_checked_prompt() -> None:
+    assert {step.prompt for step in BLUEPRINT.steps.values()} == set(EXPECTED_PLACEHOLDERS)
 
 
 def test_missing_file() -> None:

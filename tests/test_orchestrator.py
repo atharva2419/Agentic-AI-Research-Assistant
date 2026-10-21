@@ -21,7 +21,9 @@ from app.orchestrator.orchestrator import CommandRejected, Orchestrator
 from app.orchestrator.steps.cross_check import ContradictionOutput, CrossCheckOutput
 from app.search.fake import FakeSearch
 from tests.helpers import (
+    CLEAR_TOPIC,
     NO_CONTRADICTIONS,
+    SUFFICIENT,
     judge_all,
     make_deps,
     make_session,
@@ -51,7 +53,9 @@ def fixture_search(**kwargs: object) -> FakeSearch:
 
 def scripted_llm() -> FakeLLM:
     llm = FakeLLM()
+    llm.add("clarify", CLEAR_TOPIC)
     llm.add("plan", simple_plan())
+    llm.add("gap_check", SUFFICIENT)
     llm.add("relevance", judge_all(low={"S4"}), judge_all(low={"S4"}))
     llm.add("summarize", summary_for_prompt, summary_for_prompt)
     llm.add("cross_check", NO_CONTRADICTIONS)
@@ -84,7 +88,8 @@ async def test_autonomous_session_runs_start_to_finish() -> None:
     assert session.report is not None
     assert all(s.supported for s in session.report.key_takeaways)
     assert session.budget.searches == 2
-    assert session.budget.llm_calls == 7
+    # clarify, plan, 2 relevance, 2 summaries, cross-check, gap check, synthesize
+    assert session.budget.llm_calls == 9
     assert session.budget.cost_usd > 0
 
 
@@ -173,7 +178,9 @@ async def test_unknown_citations_are_flagged_not_dropped() -> None:
 
 async def test_no_usable_sources_gives_an_honest_empty_report() -> None:
     llm = FakeLLM()
+    llm.add("clarify", CLEAR_TOPIC)
     llm.add("plan", simple_plan())
+    llm.add("gap_check", SUFFICIENT)
     search = FakeSearch(default=[result("https://old.com/a", published=date(2020, 1, 1))])
     session = await Orchestrator(make_deps(llm, search)).run_until_blocked(make_session())
     assert session.status == Status.DONE

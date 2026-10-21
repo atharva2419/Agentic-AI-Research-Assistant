@@ -13,7 +13,7 @@ import sys
 
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from app.blueprint import load_blueprint
@@ -22,6 +22,7 @@ from app.llm.anthropic_client import AnthropicLLMClient
 from app.models import (
     ActionLogEntry,
     Actor,
+    AnswerQuestions,
     ApprovePlan,
     Mode,
     ResearchSession,
@@ -99,6 +100,22 @@ def print_plan(session: ResearchSession) -> None:
     console.print(f"[dim]Why: {plan.rationale}[/dim]")
 
 
+def ask_questions(session: ResearchSession) -> AnswerQuestions:
+    console.rule("The agent has questions (press Enter to skip one)")
+    answers: dict[str, str | None] = {}
+    for q in session.pending_questions():
+        console.print(f"\n[bold]{q.id}. {q.question}[/bold]")
+        console.print(f"[dim]Why: {q.why_it_matters}[/dim]")
+        for i, option in enumerate(q.suggested_options, start=1):
+            console.print(f"  {i}. {option}")
+        console.print(f"[dim]If skipped: {q.assumption_if_skipped}[/dim]")
+        reply = Prompt.ask("Your answer (number, text, or Enter to skip)", default="").strip()
+        if reply.isdigit() and 1 <= int(reply) <= len(q.suggested_options):
+            reply = q.suggested_options[int(reply) - 1]
+        answers[q.id] = reply or None
+    return AnswerQuestions(answers=answers)
+
+
 def save_outputs(session: ResearchSession) -> None:
     data_dir = PROJECT_ROOT / "data"
     (data_dir / "sessions").mkdir(parents=True, exist_ok=True)
@@ -139,6 +156,9 @@ async def run(topic: str, mode: Mode, recency_days: int) -> None:
                     console.print("Stopped. (Plan editing arrives with the web UI.)")
                     break
                 await orchestrator.handle_command(session, ApprovePlan())
+                printer(session)
+            elif session.status == Status.AWAITING_ANSWERS:
+                await orchestrator.handle_command(session, ask_questions(session))
                 printer(session)
             else:
                 break

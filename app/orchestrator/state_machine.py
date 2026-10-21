@@ -14,7 +14,8 @@ class EventType(StrEnum):
     STARTED = "started"
     QUESTIONS_ASKED = "questions_asked"
     NO_QUESTIONS = "no_questions"
-    ANSWERS_RECEIVED = "answers_received"
+    ANSWERS_RECEIVED = "answers_received"  # answers to the opening clarifying questions
+    GAP_ANSWER_RECEIVED = "gap_answer_received"  # answer to a question asked by the gap check
     PLAN_READY = "plan_ready"
     PLAN_APPROVED = "plan_approved"
     BATCH_DONE = "batch_done"
@@ -38,6 +39,9 @@ TRANSITIONS: dict[tuple[Status, EventType], Status] = {
     (Status.CLARIFYING, EventType.QUESTIONS_ASKED): Status.AWAITING_ANSWERS,
     (Status.CLARIFYING, EventType.NO_QUESTIONS): Status.PLANNING,
     (Status.AWAITING_ANSWERS, EventType.ANSWERS_RECEIVED): Status.PLANNING,
+    # After a mid-research question, re-check coverage with the answer instead of re-planning
+    # from scratch, so finished work is kept.
+    (Status.AWAITING_ANSWERS, EventType.GAP_ANSWER_RECEIVED): Status.GAP_CHECK,
     # (PLANNING, PLAN_READY) depends on the mode: see next_status().
     (Status.AWAITING_PLAN_APPROVAL, EventType.PLAN_APPROVED): Status.EXECUTING,
     (Status.EXECUTING, EventType.BATCH_DONE): Status.EXECUTING,

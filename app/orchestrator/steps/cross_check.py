@@ -86,7 +86,12 @@ async def run_cross_check(deps: AgentDeps, session: ResearchSession, task: SubTa
         validate=lambda out: contradiction_problems(out, allowed),
     )
 
+    known_pairs = {frozenset((c.source_a, c.source_b)) for c in session.contradictions}
     for c in output.contradictions:
+        # A replan's cross-check re-compares earlier sources; don't report a pair twice.
+        if frozenset((c.source_a, c.source_b)) in known_pairs:
+            continue
+        known_pairs.add(frozenset((c.source_a, c.source_b)))
         contradiction = Contradiction(
             id=f"C{len(session.contradictions) + 1}",
             topic=c.topic,
