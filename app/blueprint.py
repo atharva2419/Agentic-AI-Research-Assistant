@@ -73,6 +73,14 @@ class FilteringConfig(StrictModel):
     summarize_content_chars: int = Field(gt=0)
 
 
+class MemoryConfig(StrictModel):
+    ttl_days: int = Field(ge=1)
+    recall_top_k: int = Field(ge=0)
+    min_similarity: float = Field(ge=0, le=1)
+    max_suggestions: int = Field(ge=0)
+    page_text_retention_days: int = Field(ge=1)
+
+
 class Blueprint(StrictModel):
     name: str
     version: int
@@ -83,6 +91,7 @@ class Blueprint(StrictModel):
     allowed_subtask_types: list[SubTaskType]
     search: SearchConfig
     limits: Limits
+    memory: MemoryConfig
     filtering: FilteringConfig
 
     @model_validator(mode="after")

@@ -130,6 +130,28 @@ export interface LogEntry {
   details: Record<string, unknown>;
 }
 
+export interface MemoryMatch {
+  session_id: string;
+  topic: string;
+  summary: string;
+  key_findings: string[];
+  similarity: number;
+  created_at: string;
+}
+
+export interface MemoryItem {
+  id: string;
+  user_id: string;
+  session_id: string;
+  topic: string;
+  summary: string;
+  key_findings: string[];
+  source_urls: string[];
+  suggested_topics: string[];
+  created_at: string;
+  expires_at: string;
+}
+
 export interface Session {
   id: string;
   user_id: string;
@@ -145,6 +167,7 @@ export interface Session {
   summaries: SourceSummary[];
   contradictions: Contradiction[];
   report: Report | null;
+  related_memory: MemoryMatch[];
   budget: Budget;
   log: LogEntry[];
   error: string | null;

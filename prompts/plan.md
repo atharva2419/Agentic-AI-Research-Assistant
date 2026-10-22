@@ -30,6 +30,10 @@ Rules:
 - In `rationale`, explain in 2-3 sentences why these angles and this order, so a human reviewer
   can quickly approve or edit the plan.
 
+Past research: if the context lists past research by this user, don't plan searches that would
+only repeat it. Aim searches at what is new since then, or at what it left open, and say in the
+rationale how the plan builds on it.
+
 Date window: sources older than the recency window shown in the context are excluded by code
 before anyone reads them. If the user's clarifications or the topic need older evidence (for
 example "since ChatGPT launched in Nov 2022", or a research question about an event two years

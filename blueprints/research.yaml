@@ -57,6 +57,14 @@ limits:
   parallel_searches: 3
   parallel_llm_calls: 4
 
+# Long-term memory and data retention.
+memory:
+  ttl_days: 365 # memories expire like outdated sources do; newer ones rank higher
+  recall_top_k: 3 # related past sessions shown to a new session
+  min_similarity: 0.12 # below this, a past session isn't considered related
+  max_suggestions: 6
+  page_text_retention_days: 30 # full page text is removed from finished sessions after this
+
 filtering:
   default_recency_days: 365
   relevance_threshold: 0.6

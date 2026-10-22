@@ -264,6 +264,7 @@ class MemoryItem(DomainModel):
     source_urls: list[str]
     suggested_topics: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime  # TTL: never recalled after this, and purged at startup
 
 
 # --- The session -------------------------------------------------------------------------------

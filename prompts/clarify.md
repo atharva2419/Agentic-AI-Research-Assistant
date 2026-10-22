@@ -11,8 +11,9 @@ an answer the user hasn't given, for example:
 - audience or purpose (background for a news story, an investment view, a student essay)
 - a term with several meanings, or a time frame that matters beyond the default recency window
 
-Do not ask about things you can sensibly cover anyway, things already answered in the context,
-or details that only matter for writing style. A clear, specific topic needs no questions; that
+Do not ask about things you can sensibly cover anyway, things already answered in the context
+(including by the user's past research shown there), or details that only matter for writing
+style. A clear, specific topic needs no questions; that
 is a good outcome, not a failure.
 
 If the topic is ambiguous, ask at most {{max_questions}} short questions, most important first.

@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.api.events import EventBus, ServerEvent
-from app.api.store import SessionStore
 from app.exports import export_session
 from app.models import (
     Actor,
@@ -28,6 +27,7 @@ from app.models import (
 )
 from app.orchestrator.orchestrator import Orchestrator
 from app.orchestrator.state_machine import TERMINAL, is_runnable
+from app.storage.sessions import SessionStore
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,54 @@ class SessionRunner:
     # --- Public API used by the routes ---------------------------------------------------------
 
     def start(self, session: ResearchSession) -> SessionHandle:
+        handle = self._attach(session)
+        self.store.save(session)
+        handle.task = asyncio.create_task(self._drive(handle), name=f"session-{session.id}")
+        return handle
+
+    def get(self, session_id: str) -> SessionHandle:
+        """The live handle for a session; sessions from an earlier server run are loaded from the
+        store on first access (without a running task until a command needs one)."""
+        handle = self._handles.get(session_id)
+        if handle is None:
+            session = self.store.get(session_id)
+            if session is None:
+                raise SessionNotFound(session_id)
+            handle = self._attach(session)
+        return handle
+
+    def recover_interrupted(self) -> int:
+        """At startup: sessions that were mid-research when the server stopped are paused, not
+        resumed, so a restart never spends API credits without the user asking. Sessions waiting
+        for the user just keep waiting. Returns how many were paused."""
+        paused = 0
+        for session in self.store.list_unfinished():
+            if not is_runnable(session.status, session.paused):
+                continue
+            session.paused = True
+            session.add_log(
+                actor=Actor.SYSTEM,
+                step="restart",
+                action="server restarted while this session was running",
+                decision="paused; press Resume to continue",
+                reason="restarts never spend API credits without the user asking",
+            )
+            session.updated_at = utc_now()
+            self.store.save(session)
+            paused += 1
+        return paused
+
+    async def delete(self, session_id: str) -> None:
+        handle = self.get(session_id)
+        if handle.task is not None and not handle.task.done():
+            handle.task.cancel()
+            await asyncio.gather(handle.task, return_exceptions=True)
+        self._handles.pop(session_id, None)
+        self.store.delete(session_id)
+        if self.orchestrator.deps.memory is not None:
+            self.orchestrator.deps.memory.forget_session(session_id)
+
+    def _attach(self, session: ResearchSession) -> SessionHandle:
         handle = SessionHandle(session=session)
         session.set_log_listener(
             lambda entry: handle.bus.publish(
@@ -64,14 +112,6 @@ class SessionRunner:
             )
         )
         self._handles[session.id] = handle
-        self.store.save(session)
-        handle.task = asyncio.create_task(self._drive(handle), name=f"session-{session.id}")
-        return handle
-
-    def get(self, session_id: str) -> SessionHandle:
-        handle = self._handles.get(session_id)
-        if handle is None:
-            raise SessionNotFound(session_id)
         return handle
 
     async def submit(self, session_id: str, command: UserCommand) -> ResearchSession:

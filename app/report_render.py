@@ -38,6 +38,15 @@ def report_to_markdown(session: ResearchSession) -> str:
         if items:
             lines += [f"## {heading}", "", *(f"- {item}" for item in items), ""]
 
+    if session.related_memory:
+        lines += ["## Related past research", ""]
+        lines += [
+            f"- {m.topic} (researched {m.created_at.date().isoformat()}, "
+            f"similarity {m.similarity:.2f})"
+            for m in session.related_memory
+        ]
+        lines += ["", "_Earlier sessions, shown for context; not cited as evidence above._", ""]
+
     cited = {sid for s in _all_statements(session) for sid in s.source_ids}
     sources = [s for s in session.sources if s.id in cited]
     if sources:

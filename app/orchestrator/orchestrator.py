@@ -9,6 +9,7 @@ tests drive a whole session by calling these two methods.
 from collections.abc import Awaitable, Callable
 
 from app.llm.base import LLMError, StructuredOutputError
+from app.memory.service import MemoryService
 from app.models import (
     Actor,
     AddSubtask,
@@ -193,7 +194,30 @@ class Orchestrator:
             decision=f"mode: {session.mode}, recency window: {session.settings.recency_days} days",
             reason=session.topic,
         )
+        if self.deps.memory is not None:
+            self._recall(session, self.deps.memory)
         return EventType.STARTED
+
+    def _recall(self, session: ResearchSession, memory: MemoryService) -> None:
+        """Bring related past research into this session. It reaches every prompt through the
+        shared context block, labeled 'from past research'."""
+        session.related_memory = memory.recall(
+            session.user_id, session.topic, exclude_session_id=session.id
+        )
+        if session.related_memory:
+            session.add_log(
+                actor=Actor.AGENT,
+                step="memory",
+                action=f"recalled {len(session.related_memory)} related past session(s)",
+                decision="; ".join(
+                    f'"{m.topic}" (similarity {m.similarity:.2f})' for m in session.related_memory
+                ),
+                reason="the planner will build on these findings instead of repeating them",
+            )
+        else:
+            session.add_log(
+                actor=Actor.AGENT, step="memory", action="no related past research found"
+            )
 
     async def _clarify(self, session: ResearchSession) -> EventType:
         await run_clarify(self.deps, session)
@@ -268,6 +292,18 @@ class Orchestrator:
 
     async def _synthesize(self, session: ResearchSession) -> EventType:
         session.report = await run_synthesize(self.deps, session)
+        if self.deps.memory is not None:
+            item = self.deps.memory.remember(session)
+            if item is not None:
+                session.add_log(
+                    actor=Actor.SYSTEM,
+                    step="memory",
+                    action="saved findings to long-term memory",
+                    decision=f"{len(item.key_findings)} findings, "
+                    f"{len(item.suggested_topics)} suggested topics",
+                    reason=f"kept until {item.expires_at.date().isoformat()} "
+                    f"({self.deps.memory.config.ttl_days}-day memory TTL)",
+                )
         return EventType.REPORT_READY
 
     # --- Helpers ------------------------------------------------------------------------------

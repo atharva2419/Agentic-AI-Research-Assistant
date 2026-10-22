@@ -91,10 +91,14 @@ def research_context(deps: AgentDeps, session: ResearchSession) -> str:
         lines.append("Assumptions (the user skipped these questions; state them, don't hide them):")
         lines += [f"- {a}" for a in session.assumptions]
     if session.related_memory:
-        lines.append("From past research by this user (label anything you reuse as such):")
+        lines.append(
+            "From past research by this user (context only: not evidence for this session, "
+            "which must come from newly collected sources):"
+        )
         for match in session.related_memory:
+            age = max(0, (today - match.created_at.date()).days)
             findings = "; ".join(match.key_findings[:3])
-            lines.append(f"- {match.topic}: {findings}")
+            lines.append(f"- {match.topic} (researched {age} days ago): {findings}")
     return "\n".join(lines)
 
 

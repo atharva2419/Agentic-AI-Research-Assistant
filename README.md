@@ -30,6 +30,10 @@ http://localhost:8000. API docs are at http://localhost:8000/docs.
 **Offline demo mode (no keys, no cost):** set `OFFLINE_MODE=true` in `.env` (or the environment).
 The agent then uses a built-in fake AI and fake search that work for any topic.
 
+**Data:** sessions and long-term memory are stored in `data/research.db` (SQLite). The schema is
+managed by Alembic migrations, applied automatically on startup (or by hand:
+`uv run alembic upgrade head`). Finished reports are also written to `data/reports/`.
+
 **Terminal:** `uv run python -m app.cli "impact of AI on journalism"` (add `--offline` for demo mode).
 
 ## Tests

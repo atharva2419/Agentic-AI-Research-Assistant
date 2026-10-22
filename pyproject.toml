@@ -5,6 +5,7 @@ description = "Agentic AI personal research assistant: plans, searches, filters,
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.1",
     "anthropic>=1.16.0",
     "fastapi>=0.156.4",
     "httpx>=0.28.1",
@@ -12,6 +13,7 @@ dependencies = [
     "pydantic-settings>=2.16.1",
     "pyyaml>=6.0.3",
     "rich>=15.0.0",
+    "sqlalchemy>=2.1.6",
     "uvicorn[standard]>=0.54.0",
 ]
 

@@ -6,6 +6,7 @@ import type { Command, Status } from "../types";
 import { LogPanel } from "./LogPanel";
 import { PlanPanel } from "./PlanPanel";
 import { QuestionsPanel } from "./QuestionsPanel";
+import { RelatedResearch } from "./RelatedResearch";
 import { ReportPanel } from "./ReportPanel";
 import { SourcesPanel } from "./SourcesPanel";
 
@@ -45,9 +46,11 @@ function RecencyControl({ days, busy, onApply }: {
 interface Props {
   sessionId: string;
   onSuggestTopic: (topic: string) => void;
+  onOpenSession: (sessionId: string) => void;
+  onDeleted: () => void;
 }
 
-export function SessionView({ sessionId, onSuggestTopic }: Props) {
+export function SessionView({ sessionId, onSuggestTopic, onOpenSession, onDeleted }: Props) {
   const { session, setSession, connected } = useSessionStream(sessionId);
   const [tab, setTab] = useState<Tab>("log");
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -78,6 +81,18 @@ export function SessionView({ sessionId, onSuggestTopic }: Props) {
     setTab("sources");
   }
 
+  async function remove() {
+    if (!window.confirm("Delete this session, its report and what the agent remembers from it?")) {
+      return;
+    }
+    try {
+      await api.deleteSession(sessionId);
+      onDeleted();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "The session could not be deleted.");
+    }
+  }
+
   const pending = session.questions.filter((q) => q.answer === null && !q.skipped);
   const working = isWorking(session.status, session.paused);
   const kept = session.sources.filter((s) => s.status === "kept").length;
@@ -101,6 +116,9 @@ export function SessionView({ sessionId, onSuggestTopic }: Props) {
           <p className="hint">
             {budget.searches} searches · {budget.llm_calls} AI calls · {formatCost(budget.cost_usd)}
           </p>
+          <button className="small danger" onClick={remove}>
+            Delete session
+          </button>
           {session.status !== "failed" && (
             <div className="controls">
               {session.status !== "done" && (
@@ -140,6 +158,15 @@ export function SessionView({ sessionId, onSuggestTopic }: Props) {
       )}
 
       {error && <p className="card error">{error}</p>}
+      {session.related_memory.length > 0 && (
+        <div className="card">
+          <RelatedResearch
+            matches={session.related_memory}
+            title="From past research (used as context for planning, not as evidence):"
+            onOpen={onOpenSession}
+          />
+        </div>
+      )}
       {session.error && <p className="card error">Session failed: {session.error}</p>}
 
       {session.status === "awaiting_answers" && pending.length > 0 && (

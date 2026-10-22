@@ -22,6 +22,9 @@ Structure:
   one type of publisher, dates unknown, the recency window, assumptions made).
 - `suggested_next_topics`: 2-4 related research topics the user might want to explore next.
 
+Past research shown in the context is listed separately in the report by code. Do not restate its
+findings as statements here: they would have no citation from this session's sources.
+
 When the user skipped clarifying questions, the assumptions in the context apply; mention any that
 materially shape the conclusions in `limitations`.
 

@@ -474,10 +474,22 @@ Postgres LISTEN/NOTIFY. Stated in the README.
 
 - **SQLAlchemy 2.0 + SQLite**, schema managed by **Alembic** migrations. Swapping in Postgres is a
   change to `DATABASE_URL`.
-- Tables: `sessions` (id, user_id, topic, status, timestamps, `state_json`: the full
-  `ResearchSession` as JSON), `action_log` (one row per entry, append-only), `memory_items`.
-  Trade-off: storing the session as one JSON document keeps the code small; the parts that need queries
-  (log, memory) are proper tables. With Postgres this would be JSONB.
+- Tables: `sessions` (id, user_id, topic, status, mode, cost, timestamps, `page_text_removed`,
+  `state_json`: the full `ResearchSession` as JSON) and `memory_items` (one per finished session,
+  FK to `sessions` with ON DELETE CASCADE, `expires_at` indexed). Trade-off: storing the session as
+  one JSON document keeps the code small; filter/sort fields are real columns. With Postgres this
+  would be JSONB. The action log stays inside the session JSON; a separate append-only audit table
+  (for cross-session queries like "all overrides") is the upgrade path.
+- Migrations: `migrations/versions/0001_initial_schema.py`, run on app startup
+  (`app/storage/migrate.py`) or by hand (`uv run alembic upgrade head`). A test compares the ORM
+  models with the migrated schema, so a model change without a migration fails CI.
+- **Restarts:** sessions that were mid-research when the server stopped come back **paused**
+  (logged), never auto-resumed, so a restart can't spend API credits unasked. Sessions waiting for
+  the user keep waiting. Sessions are loaded from the database lazily on first access.
+- **TTL / retention** (in the blueprint): memory items expire after 365 days (filtered at query
+  time, purged at startup); full page text is removed from finished sessions after 30 days
+  (summaries, verified quotes, report and log are kept); sessions and reports never expire
+  automatically: the user deletes them (which also deletes their memory).
 - A **repository interface** with two implementations: SQL (real) and in-memory (tests).
 - **Memory** (simple user ID, no auth): when a session finishes, a `MemoryItem` is saved with the
   topic, summary, key findings, source URLs and the report's suggested next topics.
@@ -487,6 +499,14 @@ Postgres LISTEN/NOTIFY. Stated in the README.
 - **Use:** at `CREATED`, the top matches above a threshold go into the clarify and plan prompts, labeled
   **"from past research"** (so the agent can skip what it already knows), and the UI shows "related past
   research" plus suggested topics on the home screen.
+- **Ranking:** similarity must pass `min_similarity`; then newer memories rank higher (weight 1.0
+  when fresh, 0.5 at expiry). Only *verified* (supported) findings are remembered.
+- **Never evidence:** past findings are context only. The report lists related past research in a
+  code-built section, not as citations, because citations must point at this session's sources.
+- **Suggestions:** next topics from past reports, skipping any that add no new words to a topic
+  already researched (similarity was too aggressive: good follow-ups share the original's words).
+- **User control:** memory is per user (a simple name, no auth); the user can see what is
+  remembered, when it expires, and forget any item.
 
 ## 12. Guardrails and budgets (all in the blueprint)
 

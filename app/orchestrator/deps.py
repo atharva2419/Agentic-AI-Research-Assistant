@@ -9,6 +9,7 @@ from datetime import date
 
 from app.blueprint import Blueprint
 from app.llm.base import LLMClient
+from app.memory.service import MemoryService
 from app.prompts import PromptLibrary
 from app.search.base import SearchClient
 
@@ -21,3 +22,4 @@ class AgentDeps:
     prompts: PromptLibrary
     model_override: str | None = None  # e.g. run every step on Haiku for a cheap smoke test
     today: Callable[[], date] = field(default=date.today)
+    memory: MemoryService | None = None  # long-term memory; None = sessions don't remember

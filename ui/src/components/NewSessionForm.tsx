@@ -1,29 +1,46 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
-import type { Mode, Session } from "../types";
+import type { MemoryMatch, Mode, Session } from "../types";
+import { RelatedResearch } from "./RelatedResearch";
 
 interface Props {
+  userId: string;
   suggestedTopic: string;
   onCreated: (session: Session) => void;
+  onOpenSession: (sessionId: string) => void;
 }
 
-export function NewSessionForm({ suggestedTopic, onCreated }: Props) {
+export function NewSessionForm({ userId, suggestedTopic, onCreated, onOpenSession }: Props) {
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("supervised");
   const [recencyDays, setRecencyDays] = useState(365);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [related, setRelated] = useState<MemoryMatch[]>([]);
 
   useEffect(() => {
     if (suggestedTopic) setTopic(suggestedTopic);
   }, [suggestedTopic]);
+
+  // While the user types, preview related past research (debounced so we don't query per key).
+  useEffect(() => {
+    const text = topic.trim();
+    if (text.length < 3) {
+      setRelated([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      api.related(userId, text).then(setRelated).catch(() => setRelated([]));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [topic, userId]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      onCreated(await api.createSession(topic.trim(), mode, recencyDays));
+      onCreated(await api.createSession(userId, topic.trim(), mode, recencyDays));
       setTopic("");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not start the session.");
@@ -46,6 +63,11 @@ export function NewSessionForm({ suggestedTopic, onCreated }: Props) {
           minLength={3}
         />
       </label>
+      <RelatedResearch
+        matches={related}
+        title="You researched something related before:"
+        onOpen={onOpenSession}
+      />
       <fieldset className="mode">
         <legend>Mode</legend>
         <label>

@@ -63,6 +63,7 @@ export function session(overrides: Partial<Session> = {}): Session {
     summaries: [],
     contradictions: [],
     report: null,
+    related_memory: [],
     budget: {
       searches: 0,
       llm_calls: 0,
