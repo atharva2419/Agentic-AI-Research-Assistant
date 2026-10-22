@@ -25,6 +25,9 @@ Structure:
   one type of publisher, dates unknown, the recency window, assumptions made).
 - `suggested_next_topics`: 2-4 related research topics the user might want to explore next.
 
+If the context lists priority keywords, address each one where the sources support it (in the
+relevant section, cited as usual). If no source covers a keyword, say so in `limitations`.
+
 Past research shown in the context is listed separately in the report by code. Do not restate its
 findings as statements here: they would have no citation from this session's sources.
 

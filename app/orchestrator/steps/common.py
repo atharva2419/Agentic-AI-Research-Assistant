@@ -83,6 +83,13 @@ def research_context(deps: AgentDeps, session: ResearchSession) -> str:
         f"Recency window: sources published on or after {cutoff.isoformat()} "
         f"({session.settings.recency_days} days)",
     ]
+    if session.settings.keywords:
+        lines.append(
+            "Priority keywords from the user: "
+            + ", ".join(session.settings.keywords)
+            + ". Favour angles and sources that cover them; never exclude a source only because "
+            "it doesn't mention them."
+        )
     answered = [q for q in session.questions if q.answer is not None]
     if answered:
         lines.append("User clarifications:")

@@ -5,12 +5,13 @@ import { useSessionStream } from "../sessionStream";
 import type { Command, Status } from "../types";
 import { LogPanel } from "./LogPanel";
 import { PlanPanel } from "./PlanPanel";
+import { ProgressCard } from "./ProgressCard";
 import { QuestionsPanel } from "./QuestionsPanel";
 import { RelatedResearch } from "./RelatedResearch";
 import { ReportPanel } from "./ReportPanel";
 import { SourcesPanel } from "./SourcesPanel";
 
-type Tab = "log" | "sources" | "report";
+type Tab = "log" | "sources"; // the report has its own column
 
 // Mirrors PLAN_CHANGEABLE in app/orchestrator/overrides.py.
 const PLAN_CHANGEABLE: Status[] = ["awaiting_plan_approval", "executing", "gap_check", "done"];
@@ -57,11 +58,6 @@ export function SessionView({ sessionId, onSuggestTopic, onOpenSession, onDelete
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasReport = Boolean(session?.report);
-  useEffect(() => {
-    if (hasReport) setTab("report");
-  }, [hasReport]);
-
   if (!session) return <p className="hint">Connecting…</p>;
 
   async function send(command: Command) {
@@ -107,6 +103,15 @@ export function SessionView({ sessionId, onSuggestTopic, onOpenSession, onDelete
             {session.mode} mode · sources from the last {session.settings.recency_days} days
             {!connected && " · reconnecting…"}
           </p>
+          {session.settings.keywords.length > 0 && (
+            <div className="options" title="Priority keywords: favoured, never used to exclude">
+              {session.settings.keywords.map((k) => (
+                <span key={k} className="chip keyword">
+                  {k}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="status-block">
           <span className={`status status-${session.status}`}>
@@ -161,84 +166,92 @@ export function SessionView({ sessionId, onSuggestTopic, onOpenSession, onDelete
       )}
 
       {error && <p className="card error">{error}</p>}
-      {session.related_memory.length > 0 && (
-        <div className="card">
-          <RelatedResearch
-            matches={session.related_memory}
-            title="From past research (used as context for planning, not as evidence):"
-            onOpen={onOpenSession}
-          />
-        </div>
-      )}
       {session.error && <p className="card error">Session failed: {session.error}</p>}
 
-      {session.status === "awaiting_answers" && pending.length > 0 && (
-        <QuestionsPanel
-          key={pending.map((q) => q.id).join()}
-          questions={pending}
-          busy={busy}
-          onSubmit={(answers) => send({ type: "answer_questions", answers })}
-        />
-      )}
+      {/* Two columns on wide screens: the work on the left, the report always in view on the
+          right. On narrow screens they stack, with the report first once it exists. */}
+      <div className={session.report ? "session-grid has-report" : "session-grid"}>
+        <div className="work">
+          {session.related_memory.length > 0 && (
+            <div className="card">
+              <RelatedResearch
+                matches={session.related_memory}
+                title="From past research (used as context for planning, not as evidence):"
+                onOpen={onOpenSession}
+              />
+            </div>
+          )}
 
-      {session.assumptions.length > 0 && (
-        <div className="card assumptions">
-          <strong>Working assumptions:</strong>
-          <ul>
-            {session.assumptions.map((a) => (
-              <li key={a}>{a}</li>
-            ))}
-          </ul>
+          {session.status === "awaiting_answers" && pending.length > 0 && (
+            <QuestionsPanel
+              key={pending.map((q) => q.id).join()}
+              questions={pending}
+              busy={busy}
+              onSubmit={(answers) => send({ type: "answer_questions", answers })}
+            />
+          )}
+
+          {session.assumptions.length > 0 && (
+            <div className="card assumptions">
+              <strong>Working assumptions:</strong>
+              <ul>
+                {session.assumptions.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {session.plan && (
+            <PlanPanel
+              plan={session.plan}
+              awaitingApproval={session.status === "awaiting_plan_approval"}
+              canEdit={PLAN_CHANGEABLE.includes(session.status)}
+              busy={busy}
+              onCommand={send}
+            />
+          )}
+
+          <section className="card">
+            <nav className="tabs">
+              <button className={tab === "log" ? "active" : ""} onClick={() => setTab("log")}>
+                Action log ({session.log.length})
+              </button>
+              <button
+                className={tab === "sources" ? "active" : ""}
+                onClick={() => setTab("sources")}
+              >
+                Sources ({kept} kept / {session.sources.length - kept} excluded)
+              </button>
+            </nav>
+            {tab === "log" && <LogPanel log={session.log} />}
+            {tab === "sources" && (
+              <SourcesPanel
+                sources={session.sources}
+                summaries={session.summaries}
+                highlightId={highlight}
+                canChange={session.status !== "failed"}
+                busy={busy}
+                onCommand={send}
+              />
+            )}
+          </section>
         </div>
-      )}
 
-      {session.plan && (
-        <PlanPanel
-          plan={session.plan}
-          awaitingApproval={session.status === "awaiting_plan_approval"}
-          canEdit={PLAN_CHANGEABLE.includes(session.status)}
-          busy={busy}
-          onCommand={send}
-        />
-      )}
-
-      <section className="card">
-        <nav className="tabs">
-          <button className={tab === "log" ? "active" : ""} onClick={() => setTab("log")}>
-            Action log ({session.log.length})
-          </button>
-          <button className={tab === "sources" ? "active" : ""} onClick={() => setTab("sources")}>
-            Sources ({kept} kept / {session.sources.length - kept} excluded)
-          </button>
-          <button
-            className={tab === "report" ? "active" : ""}
-            onClick={() => setTab("report")}
-            disabled={!session.report}
-          >
-            Report
-          </button>
-        </nav>
-        {tab === "log" && <LogPanel log={session.log} />}
-        {tab === "sources" && (
-          <SourcesPanel
-            sources={session.sources}
-            summaries={session.summaries}
-            highlightId={highlight}
-            canChange={session.status !== "failed"}
-            busy={busy}
-            onCommand={send}
-          />
-        )}
-        {tab === "report" && session.report && (
-          <ReportPanel
-            report={session.report}
-            sources={session.sources}
-            reportUrl={api.reportUrl(session.id)}
-            onCite={cite}
-            onSuggestTopic={onSuggestTopic}
-          />
-        )}
-      </section>
+        <aside className="card report-col" aria-label="Report">
+          {session.report ? (
+            <ReportPanel
+              report={session.report}
+              sources={session.sources}
+              reportUrl={api.reportUrl(session.id)}
+              onCite={cite}
+              onSuggestTopic={onSuggestTopic}
+            />
+          ) : (
+            <ProgressCard session={session} />
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

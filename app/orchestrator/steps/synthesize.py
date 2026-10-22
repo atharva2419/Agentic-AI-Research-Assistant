@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 
+from app.keywords import keyword_coverage
 from app.llm.base import StructuredOutputError
 from app.models import Actor, CitedStatement, Report, ReportSection, ResearchSession
 from app.orchestrator.citations import citation_problems, mark_supported
@@ -127,6 +128,7 @@ async def run_synthesize(deps: AgentDeps, session: ResearchSession) -> Report:
         output = exc.last_valid_shape
 
     report = build_report(output, session, allowed)
+    report.keyword_coverage = keyword_coverage(session.settings.keywords, session.sources)
     statements = [*report.key_takeaways, *(c for s in report.sections for c in s.statements)]
     unsupported = sum(not s.supported for s in statements)
     session.add_log(

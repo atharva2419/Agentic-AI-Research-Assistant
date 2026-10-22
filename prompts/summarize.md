@@ -17,6 +17,9 @@ Write:
   removed if they don't match, so never paraphrase inside a quote. Return an empty list if there is
   nothing worth quoting.
 
+If the context lists priority keywords and the source says something specific about one of them,
+make sure a takeaway captures it.
+
 Only use information that is in the source. Do not add outside knowledge. If the source has
 little relevant content, say so in the summary and keep the lists short.
 

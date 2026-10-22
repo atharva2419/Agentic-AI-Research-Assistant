@@ -24,6 +24,7 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [suggestedTopic, setSuggestedTopic] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const refresh = useCallback(() => {
     api.listSessions(userId).then(setSessions).catch(() => undefined);
@@ -47,10 +48,18 @@ export function App() {
   }, [userId, refresh]);
 
   return (
-    <div className="app">
+    <div className={sidebarOpen ? "app" : "app collapsed"}>
       <aside>
         <header className="brand">
-          <span className="logo">◆</span> Research Assistant
+          <button
+            className="sidebar-toggle"
+            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            {sidebarOpen ? "«" : "»"}
+          </button>
+          <span className="logo">◆</span> <span className="brand-name">Research Assistant</span>
           {offline && (
             <span className="badge" title="Generated sources and answers; no API keys, no cost">
               offline demo
@@ -73,6 +82,7 @@ export function App() {
           suggestedTopic={suggestedTopic}
           onCreated={(session) => {
             setSelectedId(session.id);
+            setSidebarOpen(false); // give the work and the report the full width
             refresh();
           }}
           onOpenSession={setSelectedId}
@@ -80,7 +90,10 @@ export function App() {
         <MemoryPanel
           items={memory}
           suggestions={suggestions}
-          onSuggest={setSuggestedTopic}
+          onSuggest={(topic) => {
+            setSuggestedTopic(topic);
+            setSidebarOpen(true);
+          }}
           onForget={(itemId) => api.forget(userId, itemId).then(refresh)}
         />
         <SessionList sessions={sessions} selectedId={selectedId} onSelect={setSelectedId} />
@@ -90,7 +103,10 @@ export function App() {
           <SessionView
             key={selectedId}
             sessionId={selectedId}
-            onSuggestTopic={setSuggestedTopic}
+            onSuggestTopic={(topic) => {
+              setSuggestedTopic(topic);
+              setSidebarOpen(true); // the new-research form lives in the sidebar
+            }}
             onOpenSession={setSelectedId}
             onDeleted={() => {
               setSelectedId(null);

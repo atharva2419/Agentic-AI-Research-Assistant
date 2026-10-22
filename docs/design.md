@@ -508,6 +508,20 @@ Postgres LISTEN/NOTIFY. Stated in the README.
 - **User control:** memory is per user (a simple name, no auth); the user can see what is
   remembered, when it expires, and forget any item.
 
+## 11b. Priority keywords (optional)
+
+The user may give up to 8 keywords with the topic. They are **priorities, never filters**:
+- every prompt sees them through the shared context ("favour angles and sources that cover them;
+  never exclude a source only because it doesn't mention them"): the planner works them into
+  queries, the relevance judge may add up to 0.1 for a source that covers one, summaries capture
+  keyword findings, and the report addresses each one or lists it as a limitation;
+- code counts, per keyword, the kept sources that mention it (`app/keywords.py`). The gap check
+  sees these counts, so an uncovered keyword can trigger one targeted replan search;
+- the report gets a code-built "Priority keyword coverage" line (keyword → sources).
+
+No extra LLM calls. Trade-off: matching is plain text (case-insensitive substring), so
+synonyms aren't counted; the prompts still treat the keyword's meaning.
+
 ## 12. Guardrails and budgets (all in the blueprint)
 
 | Guardrail | Default |

@@ -106,6 +106,31 @@ export function ReportPanel({ report, sources, reportUrl, onCite, onSuggestTopic
       <List title="Assumptions" items={report.assumptions} />
       <List title="Limitations" items={report.limitations} />
 
+      {Object.keys(report.keyword_coverage).length > 0 && (
+        <>
+          <h3>Priority keyword coverage</h3>
+          <ul className="keyword-coverage">
+            {Object.entries(report.keyword_coverage).map(([keyword, ids]) => (
+              <li key={keyword}>
+                <span className="chip keyword">{keyword}</span>{" "}
+                {ids.length === 0 ? (
+                  <span className="warn">no source mentions it</span>
+                ) : (
+                  <>
+                    {ids.length} source{ids.length > 1 ? "s" : ""}:{" "}
+                    {ids.map((id) => (
+                      <button key={id} className="cite" onClick={() => onCite(id)}>
+                        {id}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {report.suggested_next_topics.length > 0 && (
         <>
           <h3>Suggested next topics</h3>

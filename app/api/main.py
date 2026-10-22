@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from app.api.events import KEEPALIVE, ServerEvent, format_sse, session_view
 from app.api.runner import SessionNotFound, SessionRunner
 from app.config import PROJECT_ROOT, get_settings
+from app.keywords import MAX_KEYWORD_LENGTH, MAX_KEYWORDS, normalize_keywords
 from app.memory.service import MemoryService
 from app.memory.store import InMemoryMemoryStore, MemoryStore, SqlMemoryStore
 from app.models import (
@@ -54,6 +55,9 @@ class CreateSession(BaseModel):
     mode: Mode = Mode.SUPERVISED
     recency_days: int = Field(default=365, ge=1, le=3650)
     user_id: str = Field(default="demo", min_length=1, max_length=64)
+    keywords: list[Annotated[str, Field(max_length=MAX_KEYWORD_LENGTH)]] = Field(
+        default_factory=list, max_length=MAX_KEYWORDS
+    )
 
 
 class SessionSummary(BaseModel):
@@ -116,7 +120,11 @@ async def create_session(body: CreateSession, runner: Runner) -> dict[str, Any]:
         user_id=body.user_id,
         topic=body.topic.strip(),
         mode=body.mode,
-        settings=SessionSettings(recency_days=body.recency_days, relevance_threshold=threshold),
+        settings=SessionSettings(
+            recency_days=body.recency_days,
+            relevance_threshold=threshold,
+            keywords=normalize_keywords(body.keywords),
+        ),
     )
     runner.start(session)
     return session_view(session)

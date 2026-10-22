@@ -107,6 +107,7 @@ export interface Report {
   assumptions: string[];
   limitations: string[];
   suggested_next_topics: string[];
+  keyword_coverage: Record<string, string[]>; // keyword -> kept sources mentioning it
 }
 
 export interface Budget {
@@ -159,7 +160,7 @@ export interface Session {
   mode: Mode;
   status: Status;
   paused: boolean;
-  settings: { recency_days: number; relevance_threshold: number };
+  settings: { recency_days: number; relevance_threshold: number; keywords: string[] };
   questions: ClarifyingQuestion[];
   assumptions: string[];
   plan: ResearchPlan | null;

@@ -10,6 +10,9 @@ Review each research question:
 - Is the evidence one-sided (a single publisher, only company announcements, only opinion)?
 - Did searches return mostly outdated or irrelevant results, suggesting a better query?
 
+If the user gave priority keywords, the coverage includes how many kept sources mention each one.
+A priority keyword with no sources is a gap worth one targeted search, if a replan is allowed.
+
 Then choose one verdict:
 - `sufficient`: the evidence supports a useful report. Minor gaps can be listed as limitations;
   do not search more just to be thorough.

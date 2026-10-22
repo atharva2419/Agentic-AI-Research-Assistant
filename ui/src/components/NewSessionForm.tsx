@@ -3,6 +3,20 @@ import { api, ApiError } from "../api";
 import type { MemoryMatch, Mode, Session } from "../types";
 import { RelatedResearch } from "./RelatedResearch";
 
+/** "GA4, hreflang ,, GA4" -> ["GA4", "hreflang"]. The server also cleans and limits them. */
+export function parseKeywords(text: string): string[] {
+  const seen = new Set<string>();
+  const keywords: string[] = [];
+  for (const part of text.split(",")) {
+    const keyword = part.trim().replace(/\s+/g, " ");
+    if (keyword && !seen.has(keyword.toLowerCase())) {
+      seen.add(keyword.toLowerCase());
+      keywords.push(keyword);
+    }
+  }
+  return keywords.slice(0, 8);
+}
+
 interface Props {
   userId: string;
   suggestedTopic: string;
@@ -14,6 +28,7 @@ export function NewSessionForm({ userId, suggestedTopic, onCreated, onOpenSessio
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("supervised");
   const [recencyDays, setRecencyDays] = useState(365);
+  const [keywords, setKeywords] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [related, setRelated] = useState<MemoryMatch[]>([]);
@@ -40,8 +55,11 @@ export function NewSessionForm({ userId, suggestedTopic, onCreated, onOpenSessio
     setBusy(true);
     setError(null);
     try {
-      onCreated(await api.createSession(userId, topic.trim(), mode, recencyDays));
+      onCreated(
+        await api.createSession(userId, topic.trim(), mode, recencyDays, parseKeywords(keywords)),
+      );
       setTopic("");
+      setKeywords("");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not start the session.");
     } finally {
@@ -61,6 +79,14 @@ export function NewSessionForm({ userId, suggestedTopic, onCreated, onOpenSessio
           rows={3}
           required
           minLength={3}
+        />
+      </label>
+      <label>
+        Keywords to prioritise <span className="hint">(optional, comma-separated)</span>
+        <input
+          value={keywords}
+          onChange={(e) => setKeywords(e.target.value)}
+          placeholder="e.g. GA4, hreflang, headless"
         />
       </label>
       <RelatedResearch

@@ -30,6 +30,10 @@ Rules:
 - In `rationale`, explain in 2-3 sentences why these angles and this order, so a human reviewer
   can quickly approve or edit the plan.
 
+Priority keywords: if the context lists priority keywords, make sure the plan gives each one a
+fair chance to be found: work them into search queries where they fit naturally (several can share
+a query). They are priorities, not limits: still cover the topic as a whole.
+
 Past research: if the context lists past research by this user, don't plan searches that would
 only repeat it. Aim searches at what is new since then, or at what it left open, and say in the
 rationale how the plan builds on it.

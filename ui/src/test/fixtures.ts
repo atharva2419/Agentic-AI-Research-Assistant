@@ -44,6 +44,7 @@ export function report(): Report {
     assumptions: ["US focus"],
     limitations: [],
     suggested_next_topics: ["AI and local news"],
+    keyword_coverage: {},
   };
 }
 
@@ -55,7 +56,7 @@ export function session(overrides: Partial<Session> = {}): Session {
     mode: "supervised",
     status: "executing",
     paused: false,
-    settings: { recency_days: 365, relevance_threshold: 0.6 },
+    settings: { recency_days: 365, relevance_threshold: 0.6, keywords: [] },
     questions: [],
     assumptions: [],
     plan: null,

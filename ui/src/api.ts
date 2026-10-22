@@ -32,10 +32,16 @@ export const api = {
   listSessions: (userId: string) =>
     request<SessionSummary[]>(`/api/sessions?user_id=${encodeURIComponent(userId)}`),
 
-  createSession: (userId: string, topic: string, mode: Mode, recencyDays: number) =>
+  createSession: (
+    userId: string,
+    topic: string,
+    mode: Mode,
+    recencyDays: number,
+    keywords: string[],
+  ) =>
     request<Session>("/api/sessions", {
       method: "POST",
-      body: JSON.stringify({ user_id: userId, topic, mode, recency_days: recencyDays }),
+      body: JSON.stringify({ user_id: userId, topic, mode, recency_days: recencyDays, keywords }),
     }),
 
   deleteSession: (sessionId: string) =>

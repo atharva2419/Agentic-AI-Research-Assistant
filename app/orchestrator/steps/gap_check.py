@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.keywords import keyword_coverage
 from app.models import (
     Actor,
     Mode,
@@ -214,6 +215,13 @@ def coverage_text(session: ResearchSession) -> str:
     if session.contradictions:
         lines.append("Contradictions found so far:")
         lines += [f"- {c.topic}: {c.source_a} vs {c.source_b}" for c in session.contradictions]
+    if session.settings.keywords:
+        lines.append("Priority keyword coverage (kept sources mentioning each, counted by code):")
+        coverage = keyword_coverage(session.settings.keywords, session.sources)
+        lines += [
+            f"- {keyword}: {len(ids)} source(s) {', '.join(ids)}".rstrip()
+            for keyword, ids in coverage.items()
+        ]
     return "\n".join(lines).strip()
 
 

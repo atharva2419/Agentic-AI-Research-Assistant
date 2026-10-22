@@ -96,6 +96,7 @@ class Actor(StrEnum):
 class SessionSettings(DomainModel):
     recency_days: int = Field(default=365, ge=1, le=3650)
     relevance_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    keywords: list[str] = Field(default_factory=list)  # optional priorities; never filters
 
 
 class ClarifyingQuestion(DomainModel):
@@ -217,6 +218,8 @@ class Report(DomainModel):
     assumptions: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     suggested_next_topics: list[str] = Field(default_factory=list)
+    # Set by code: priority keyword -> kept source IDs that mention it.
+    keyword_coverage: dict[str, list[str]] = Field(default_factory=dict)
 
 
 # --- Transparency, budgets, memory -------------------------------------------------------------

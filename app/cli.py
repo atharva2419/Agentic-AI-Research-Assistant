@@ -19,6 +19,7 @@ from rich.table import Table
 
 from app.config import get_settings
 from app.exports import export_session
+from app.keywords import MAX_KEYWORDS, normalize_keywords
 from app.models import (
     ActionLogEntry,
     Actor,
@@ -96,7 +97,13 @@ def save_outputs(session: ResearchSession) -> None:
     console.print(f"[dim]Saved {session_path} and {report_path}[/dim]")
 
 
-async def run(topic: str, mode: Mode, recency_days: int, offline: bool = False) -> None:
+async def run(
+    topic: str,
+    mode: Mode,
+    recency_days: int,
+    offline: bool = False,
+    keywords: list[str] | None = None,
+) -> None:
     settings = get_settings()
     try:
         wiring = build_wiring(settings, offline=offline or None)
@@ -113,6 +120,7 @@ async def run(topic: str, mode: Mode, recency_days: int, offline: bool = False) 
         mode=mode,
         settings=SessionSettings(
             recency_days=recency_days,
+            keywords=normalize_keywords(keywords or [])[:MAX_KEYWORDS],
             relevance_threshold=deps.blueprint.filtering.relevance_threshold,
         ),
     )
@@ -156,8 +164,10 @@ def main() -> None:
     parser.add_argument("--mode", choices=[m.value for m in Mode], default=Mode.SUPERVISED.value)
     parser.add_argument("--recency-days", type=int, default=365)
     parser.add_argument("--offline", action="store_true", help="free demo mode, no API keys")
+    parser.add_argument("--keywords", default="", help='priority keywords, e.g. "GA4, hreflang"')
     args = parser.parse_args()
-    asyncio.run(run(args.topic, Mode(args.mode), args.recency_days, args.offline))
+    keywords = args.keywords.split(",")
+    asyncio.run(run(args.topic, Mode(args.mode), args.recency_days, args.offline, keywords))
 
 
 if __name__ == "__main__":

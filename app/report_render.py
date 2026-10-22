@@ -29,6 +29,13 @@ def report_to_markdown(session: ResearchSession) -> str:
                 + (f" _Likely cause: {c.likely_cause}_" if c.likely_cause else "")
             )
         lines.append("")
+    if report.keyword_coverage:
+        lines += ["## Priority keyword coverage", ""]
+        lines += [
+            f"- {keyword}: {len(ids)} source(s)" + (f" ({', '.join(ids)})" if ids else "")
+            for keyword, ids in report.keyword_coverage.items()
+        ]
+        lines.append("")
     for heading, items in (
         ("Open questions", report.open_questions),
         ("Assumptions", report.assumptions),

@@ -11,6 +11,10 @@ Score every source from 0.0 to 1.0:
   audience) than the user asked for.
 - 0.0-0.2: off-topic, spam, a navigation or listing page, or a paywall/cookie notice with no content.
 
+If the context lists priority keywords, a source that substantively covers one may score up to
+0.1 higher (say which keyword in the reason). Never lower a source's score just because it doesn't
+mention a keyword.
+
 Give a one-sentence reason a human can check quickly, e.g. "Survey of 300 US newsrooms on AI
 adoption, answers RQ1 directly."
 
