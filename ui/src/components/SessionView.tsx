@@ -129,18 +129,21 @@ export function SessionView({ sessionId, onSuggestTopic, onOpenSession, onDelete
                   {session.paused ? "Resume" : "Pause"}
                 </button>
               )}
-              <button
-                disabled={busy}
-                title="Autonomous: never waits for you. Supervised: asks and waits for plan approval."
-                onClick={() =>
-                  send({
-                    type: "set_mode",
-                    mode: session.mode === "supervised" ? "autonomous" : "supervised",
-                  })
-                }
-              >
-                Switch to {session.mode === "supervised" ? "autonomous" : "supervised"}
-              </button>
+              {session.status !== "done" && (
+                // Mode only affects what the agent waits for, so it means nothing once done.
+                <button
+                  disabled={busy}
+                  title="Autonomous: never waits for you. Supervised: asks and waits for plan approval."
+                  onClick={() =>
+                    send({
+                      type: "set_mode",
+                      mode: session.mode === "supervised" ? "autonomous" : "supervised",
+                    })
+                  }
+                >
+                  Switch to {session.mode === "supervised" ? "autonomous" : "supervised"}
+                </button>
+              )}
               <RecencyControl
                 days={session.settings.recency_days}
                 busy={busy}

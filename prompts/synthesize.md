@@ -16,7 +16,10 @@ Structure:
   evidence allows us to be, and the most important disagreement if there is one. No citations here.
 - `key_takeaways`: 3-6 cited statements, most important first.
 - `sections`: one per research question (use the question as the heading, rephrased as a short
-  title), each with 2-5 cited statements. Write statements as complete, specific sentences.
+  title), each with 2-5 cited statements and never more than 6. Write statements as complete,
+  specific sentences. If you have more points than that, merge related ones into one statement
+  (citing all their sources) or keep the strongest: the reader is busy, and the sources tab holds
+  the detail.
 - `open_questions`: what the evidence does not answer and would be worth investigating next.
 - `limitations`: honest limits of this research (few sources on a question, sources mostly from
   one type of publisher, dates unknown, the recency window, assumptions made).

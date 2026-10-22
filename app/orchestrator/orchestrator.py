@@ -144,6 +144,8 @@ class Orchestrator:
             self._transition(session, EventType.PLAN_CHANGED)
 
     def _set_mode(self, session: ResearchSession, command: SetMode) -> None:
+        if session.status in {Status.DONE, Status.FAILED}:
+            raise CommandRejected("the mode only affects a running session")
         if command.mode == session.mode:
             raise CommandRejected(f"the session is already in {command.mode} mode")
         session.mode = command.mode

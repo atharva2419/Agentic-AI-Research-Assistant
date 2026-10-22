@@ -279,6 +279,12 @@ async def test_switching_to_autonomous_skips_waiting_questions() -> None:
 # --- State machine -----------------------------------------------------------------------------
 
 
+async def test_switching_mode_after_done_is_rejected() -> None:
+    orchestrator, session = await finished(llm())
+    with pytest.raises(CommandRejected, match="running session"):
+        await orchestrator.handle_command(session, SetMode(mode=Mode.SUPERVISED))
+
+
 def test_done_reopens_but_failed_stays_final() -> None:
     from app.orchestrator.state_machine import InvalidTransition
 

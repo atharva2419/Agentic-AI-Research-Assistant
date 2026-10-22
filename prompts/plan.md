@@ -35,11 +35,17 @@ only repeat it. Aim searches at what is new since then, or at what it left open,
 rationale how the plan builds on it.
 
 Date window: sources older than the recency window shown in the context are excluded by code
-before anyone reads them. If the user's clarifications or the topic need older evidence (for
-example "since ChatGPT launched in Nov 2022", or a research question about an event two years
-ago), set `recency_days` to the number of days from today's date that covers that period, and
-explain why in `recency_reason`. The window can only be widened, never narrowed. Otherwise set
-`recency_days` to null and `recency_reason` to an empty string.
+before anyone reads them. The window can only be widened, never narrowed. Widen it in two cases,
+setting `recency_days` (days back from today's date) and explaining why in `recency_reason`:
+- The user's clarifications or the topic name an older period (for example "since ChatGPT
+  launched in Nov 2022", or a research question about an event two years ago): cover that period.
+- The topic is mostly evergreen: how-to, best practices, definitions, methods, or established
+  tools, where authoritative guides stay valid for years. Widen to at most 1095 days (3 years),
+  so foundational guides aren't thrown away. Searches about recent developments still find recent
+  sources; the wider window only stops older references from being excluded.
+Keep the window for news-like topics (events, market moves, policy changes, "latest"), where
+older sources really are outdated. Otherwise set `recency_days` to null and `recency_reason` to an
+empty string.
 
 ## user
 {{context}}
