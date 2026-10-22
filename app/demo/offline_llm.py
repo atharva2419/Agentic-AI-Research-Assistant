@@ -144,6 +144,8 @@ class OfflineLLM:
             ],
             rationale="Start with recent news for the current picture, then studies for "
             "measured impact, and cross-check the figures because surveys often disagree.",
+            recency_days=None,
+            recency_reason="",
         )
 
     def _relevance(self, request: LLMRequest) -> RelevanceOutput:

@@ -110,6 +110,8 @@ def simple_plan() -> PlanOutput:
             cross_check_task("t4", ["t3"]),
         ],
         rationale="Adoption first, then impact; cross-check the job numbers.",
+        recency_days=None,
+        recency_reason="",
     )
 
 

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # Built-in fake AI and search: no API keys, no cost. For UI work and as a demo fallback.
     offline_mode: bool = False
     log_level: str = "INFO"
+    data_dir: Path = PROJECT_ROOT / "data"  # finished sessions and reports are exported here
     blueprint_path: Path = PROJECT_ROOT / "blueprints" / "research.yaml"
     prompts_dir: Path = PROJECT_ROOT / "prompts"
 

@@ -12,9 +12,11 @@ Concurrency rules (all on one event loop, so no threads):
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from app.api.events import EventBus, ServerEvent
 from app.api.store import SessionStore
+from app.exports import export_session
 from app.models import (
     Actor,
     Pause,
@@ -44,9 +46,12 @@ class SessionHandle:
 
 
 class SessionRunner:
-    def __init__(self, orchestrator: Orchestrator, store: SessionStore) -> None:
+    def __init__(
+        self, orchestrator: Orchestrator, store: SessionStore, export_dir: Path | None = None
+    ) -> None:
         self.orchestrator = orchestrator
         self.store = store
+        self.export_dir = export_dir  # None = don't write files (tests)
         self._handles: dict[str, SessionHandle] = {}
 
     # --- Public API used by the routes ---------------------------------------------------------
@@ -104,6 +109,17 @@ class SessionRunner:
                 self._after_change(handle)
             else:
                 await handle.wakeup.wait()
+        # Finished (or failed): write the report and session to disk. A reopened session ends
+        # here again and overwrites the files with the revised report.
+        self._export(session)
+
+    def _export(self, session: ResearchSession) -> None:
+        if self.export_dir is None:
+            return
+        try:
+            export_session(session, self.export_dir)
+        except OSError:
+            logger.exception("could not export session %s", session.id)
 
     async def _safe_step(self, session: ResearchSession) -> None:
         """The orchestrator already turns LLM failures into a FAILED session. This catches bugs,

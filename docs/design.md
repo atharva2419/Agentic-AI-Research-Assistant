@@ -376,6 +376,12 @@ Each search sends `topic` (news or general, chosen per sub-task by the planner),
 so no separate scraper is needed), `max_results` from the blueprint, and `search_depth="basic"`
 (1 credit). The free tier is 1,000 credits a month; the blueprint caps searches per session (default 12).
 
+**The planner may widen the window.** The plan output includes `recency_days` (or null) with a
+reason. If the user's framing needs older evidence ("since ChatGPT launched in Nov 2022"), code
+widens the window before any search runs and logs it as an agent decision. Code never narrows the
+user's window. Added after the first live run, where a 365-day default excluded 17 key sources the
+user's own time frame required.
+
 **We do not ask Tavily to filter by date.** Code does it, so that (a) every exclusion is visible
 to the user with a reason, (b) the rule is testable, and (c) changing the recency window mid-session can
 re-evaluate sources already found without searching again.

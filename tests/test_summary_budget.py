@@ -21,6 +21,8 @@ def two_group_session(per_search: dict[str, list[float]]) -> ResearchSession:
             summarize_task("s2", ["t5", "t6", "t7"]),
         ],
         rationale="r",
+        recency_days=None,
+        recency_reason="",
     )
     session = make_session()
     session.plan = to_research_plan(plan)

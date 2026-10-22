@@ -22,9 +22,10 @@ def report_to_markdown(session: ResearchSession) -> str:
     if report.contradictions:
         lines += ["## Contradictions between sources", ""]
         for c in report.contradictions:
+            # Claims often end with their own period; strip it so sentences don't end in "..".
             lines.append(
-                f"- **{c.topic}**: [{c.source_a}] says {c.claim_a} — [{c.source_b}] says "
-                f"{c.claim_b}. {c.explanation}"
+                f"- **{c.topic}**: [{c.source_a}] says {c.claim_a.rstrip('.')}; "
+                f"[{c.source_b}] says {c.claim_b.rstrip('.')}. {c.explanation}"
                 + (f" _Likely cause: {c.likely_cause}_" if c.likely_cause else "")
             )
         lines.append("")

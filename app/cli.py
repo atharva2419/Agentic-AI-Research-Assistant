@@ -17,7 +17,8 @@ from rich.markdown import Markdown
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from app.config import PROJECT_ROOT, get_settings
+from app.config import get_settings
+from app.exports import export_session
 from app.models import (
     ActionLogEntry,
     Actor,
@@ -91,18 +92,8 @@ def ask_questions(session: ResearchSession) -> AnswerQuestions:
 
 
 def save_outputs(session: ResearchSession) -> None:
-    data_dir = PROJECT_ROOT / "data"
-    (data_dir / "sessions").mkdir(parents=True, exist_ok=True)
-    (data_dir / "reports").mkdir(parents=True, exist_ok=True)
-    (data_dir / "sessions" / f"{session.id}.json").write_text(
-        session.model_dump_json(indent=2), encoding="utf-8"
-    )
-    (data_dir / "reports" / f"{session.id}.md").write_text(
-        report_to_markdown(session), encoding="utf-8"
-    )
-    console.print(
-        f"[dim]Saved data/sessions/{session.id}.json and data/reports/{session.id}.md[/dim]"
-    )
+    session_path, report_path = export_session(session, get_settings().data_dir)
+    console.print(f"[dim]Saved {session_path} and {report_path}[/dim]")
 
 
 async def run(topic: str, mode: Mode, recency_days: int, offline: bool = False) -> None:
