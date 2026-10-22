@@ -65,7 +65,11 @@ export interface Source {
   status: "kept" | "excluded";
   relevance_score: number | null;
   relevance_reason: string | null;
-  exclusion: { stage: "rule" | "relevance" | "user"; reason: string } | null;
+  exclusion: {
+    stage: "rule" | "relevance" | "user";
+    reason: string;
+    rule: "recency" | "content" | "domain_cap" | null;
+  } | null;
 }
 
 export interface SourceSummary {
@@ -157,9 +161,23 @@ export interface SessionSummary {
   cost_usd: number;
 }
 
-// The commands the API accepts (app/models.py UserCommand). Phase 6 adds the override commands.
+// The commands the API accepts (app/models.py UserCommand).
 export type Command =
   | { type: "answer_questions"; answers: Record<string, string | null> }
   | { type: "approve_plan" }
   | { type: "pause" }
-  | { type: "resume" };
+  | { type: "resume" }
+  | { type: "edit_plan"; edits: { id: string; title?: string; query?: string }[] }
+  | { type: "skip_subtask"; subtask_id: string }
+  | {
+      type: "add_subtask";
+      query: string;
+      search_mode: "news" | "general";
+      research_question_ids: string[];
+    }
+  | { type: "exclude_source"; source_id: string; reason: string | null }
+  | { type: "include_source"; source_id: string }
+  | { type: "set_recency"; recency_days: number }
+  | { type: "set_mode"; mode: Mode };
+
+export type SendCommand = (command: Command) => void;

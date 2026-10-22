@@ -79,6 +79,9 @@ class SessionRunner:
             async with handle.lock:
                 await self.orchestrator.handle_command(handle.session, command)
         self._after_change(handle)
+        if (handle.task is None or handle.task.done()) and handle.session.status not in TERMINAL:
+            # A finished session was reopened by an override: its loop had ended, start a new one.
+            handle.task = asyncio.create_task(self._drive(handle), name=f"session-{session_id}")
         handle.wakeup.set()
         return handle.session
 

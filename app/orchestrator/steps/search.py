@@ -145,7 +145,9 @@ def _apply_search_results(
         )
         if outcome.exclusion_reason:
             source.status = SourceStatus.EXCLUDED
-            source.exclusion = Exclusion(stage=ExclusionStage.RULE, reason=outcome.exclusion_reason)
+            source.exclusion = Exclusion(
+                stage=ExclusionStage.RULE, reason=outcome.exclusion_reason, rule=outcome.rule
+            )
             rule_exclusions.append(source)
         else:
             to_judge.append(source)

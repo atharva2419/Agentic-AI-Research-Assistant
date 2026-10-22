@@ -22,7 +22,8 @@ from app.api.runner import SessionNotFound, SessionRunner
 from app.api.store import InMemorySessionStore
 from app.config import PROJECT_ROOT, get_settings
 from app.models import Mode, ResearchSession, SessionSettings, UserCommand
-from app.orchestrator.orchestrator import CommandRejected, Orchestrator
+from app.orchestrator.errors import CommandRejected
+from app.orchestrator.orchestrator import Orchestrator
 from app.report_render import report_to_markdown
 from app.wiring import Wiring, build_wiring
 

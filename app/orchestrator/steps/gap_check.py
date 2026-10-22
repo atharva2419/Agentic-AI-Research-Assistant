@@ -105,9 +105,13 @@ def next_task_number(plan: ResearchPlan) -> int:
 
 
 def build_replan_tasks(
-    plan: ResearchPlan, searches: list[NewSearchOutput], allowed: list[SubTaskType]
+    plan: ResearchPlan,
+    searches: list[NewSearchOutput],
+    allowed: list[SubTaskType],
+    origin: Origin = Origin.REPLAN,
 ) -> list[SubTask]:
-    """New search tasks, one summarize task over them, and a cross-check of new vs. existing."""
+    """New search tasks, one summarize task over them, and a cross-check of new vs. existing.
+    Used for agent replans and for searches the user adds (origin=user)."""
     n = next_task_number(plan)
     new: list[SubTask] = []
     for s in searches:
@@ -119,7 +123,7 @@ def build_replan_tasks(
                 query=s.query,
                 search_mode=s.search_mode,
                 research_question_ids=s.research_question_ids,
-                origin=Origin.REPLAN,
+                origin=origin,
             )
         )
         n += 1
@@ -128,7 +132,7 @@ def build_replan_tasks(
         type=SubTaskType.SUMMARIZE,
         title="Summarize sources from follow-up searches",
         depends_on=[t.id for t in new],
-        origin=Origin.REPLAN,
+        origin=origin,
     )
     new.append(summarize)
     if SubTaskType.CROSS_CHECK in allowed:
@@ -140,7 +144,7 @@ def build_replan_tasks(
                 title="Cross-check follow-up sources against earlier ones",
                 focus="Do the new sources confirm or contradict the earlier findings?",
                 depends_on=[summarize.id, *earlier],
-                origin=Origin.REPLAN,
+                origin=origin,
             )
         )
     return new

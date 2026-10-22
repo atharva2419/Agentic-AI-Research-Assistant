@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.blueprint import FilteringConfig
-from app.models import Source, SourceStatus
+from app.models import ExclusionRule, Source, SourceStatus
 from app.search.base import SearchResult
 
 TRACKING_PARAMS = ("utm_", "fbclid", "gclid", "mc_cid", "mc_eid", "ref")
@@ -52,6 +52,7 @@ def recency_problem(
 class RuleOutcome:
     result: SearchResult
     exclusion_reason: str | None  # None = passed all rules
+    rule: ExclusionRule | None = None  # which rule excluded it
 
 
 @dataclass
@@ -89,25 +90,30 @@ def apply_rules(
             continue
         seen.add(key)
 
+        rule: ExclusionRule | None = None
         reason = recency_problem(
             result.published_date,
             today=today,
             recency_days=recency_days,
             unknown_date_policy=config.unknown_date_policy,
         )
-        if reason is None and len(result.content.strip()) < config.min_content_chars:
+        if reason is not None:
+            rule = "recency"
+        elif len(result.content.strip()) < config.min_content_chars:
+            rule = "content"
             reason = (
                 f"too little content ({len(result.content.strip())} characters, "
                 f"minimum {config.min_content_chars})"
             )
         domain = domain_of(result.url)
         if reason is None and kept_per_domain.get(domain, 0) >= config.max_sources_per_domain:
+            rule = "domain_cap"
             reason = (
                 f"already {config.max_sources_per_domain} sources from {domain}; "
                 "capped for source diversity"
             )
         if reason is None:
             kept_per_domain[domain] = kept_per_domain.get(domain, 0) + 1
-        report.outcomes.append(RuleOutcome(result=result, exclusion_reason=reason))
+        report.outcomes.append(RuleOutcome(result=result, exclusion_reason=reason, rule=rule))
 
     return report

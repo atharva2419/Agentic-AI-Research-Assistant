@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import { STATUS_LABEL, formatCost, isWorking } from "../format";
 import { useSessionStream } from "../sessionStream";
-import type { Command } from "../types";
+import type { Command, Status } from "../types";
 import { LogPanel } from "./LogPanel";
 import { PlanPanel } from "./PlanPanel";
 import { QuestionsPanel } from "./QuestionsPanel";
@@ -10,6 +10,37 @@ import { ReportPanel } from "./ReportPanel";
 import { SourcesPanel } from "./SourcesPanel";
 
 type Tab = "log" | "sources" | "report";
+
+// Mirrors PLAN_CHANGEABLE in app/orchestrator/overrides.py.
+const PLAN_CHANGEABLE: Status[] = ["awaiting_plan_approval", "executing", "gap_check", "done"];
+
+function RecencyControl({ days, busy, onApply }: {
+  days: number;
+  busy: boolean;
+  onApply: (days: number) => void;
+}) {
+  const [value, setValue] = useState(days);
+  useEffect(() => setValue(days), [days]);
+  return (
+    <span className="inline-edit" title="Re-checks every source already found against the new window">
+      <label>
+        Window{" "}
+        <input
+          aria-label="Date window in days"
+          type="number"
+          min={1}
+          max={3650}
+          value={value}
+          onChange={(e) => setValue(Number(e.target.value))}
+        />{" "}
+        days
+      </label>
+      <button disabled={busy || value === days || value < 1} onClick={() => onApply(value)}>
+        Apply
+      </button>
+    </span>
+  );
+}
 
 interface Props {
   sessionId: string;
@@ -70,16 +101,43 @@ export function SessionView({ sessionId, onSuggestTopic }: Props) {
           <p className="hint">
             {budget.searches} searches · {budget.llm_calls} AI calls · {formatCost(budget.cost_usd)}
           </p>
-          {!["done", "failed"].includes(session.status) && (
-            <button
-              disabled={busy}
-              onClick={() => send({ type: session.paused ? "resume" : "pause" })}
-            >
-              {session.paused ? "Resume" : "Pause"}
-            </button>
+          {session.status !== "failed" && (
+            <div className="controls">
+              {session.status !== "done" && (
+                <button
+                  disabled={busy}
+                  onClick={() => send({ type: session.paused ? "resume" : "pause" })}
+                >
+                  {session.paused ? "Resume" : "Pause"}
+                </button>
+              )}
+              <button
+                disabled={busy}
+                title="Autonomous: never waits for you. Supervised: asks and waits for plan approval."
+                onClick={() =>
+                  send({
+                    type: "set_mode",
+                    mode: session.mode === "supervised" ? "autonomous" : "supervised",
+                  })
+                }
+              >
+                Switch to {session.mode === "supervised" ? "autonomous" : "supervised"}
+              </button>
+              <RecencyControl
+                days={session.settings.recency_days}
+                busy={busy}
+                onApply={(days) => send({ type: "set_recency", recency_days: days })}
+              />
+            </div>
           )}
         </div>
       </header>
+      {session.status === "executing" && session.report && (
+        <p className="card notice">
+          Revising the report after your change. The previous version stays visible until the new
+          one is ready.
+        </p>
+      )}
 
       {error && <p className="card error">{error}</p>}
       {session.error && <p className="card error">Session failed: {session.error}</p>}
@@ -108,8 +166,9 @@ export function SessionView({ sessionId, onSuggestTopic }: Props) {
         <PlanPanel
           plan={session.plan}
           awaitingApproval={session.status === "awaiting_plan_approval"}
+          canEdit={PLAN_CHANGEABLE.includes(session.status)}
           busy={busy}
-          onApprove={() => send({ type: "approve_plan" })}
+          onCommand={send}
         />
       )}
 
@@ -135,6 +194,9 @@ export function SessionView({ sessionId, onSuggestTopic }: Props) {
             sources={session.sources}
             summaries={session.summaries}
             highlightId={highlight}
+            canChange={session.status !== "failed"}
+            busy={busy}
+            onCommand={send}
           />
         )}
         {tab === "report" && session.report && (

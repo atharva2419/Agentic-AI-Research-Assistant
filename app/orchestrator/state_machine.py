@@ -24,6 +24,7 @@ class EventType(StrEnum):
     NEEDS_USER = "needs_user"
     SUFFICIENT = "sufficient"
     REPORT_READY = "report_ready"
+    PLAN_CHANGED = "plan_changed"  # a user override created work or changed the evidence
     FAILED = "failed"
 
 
@@ -50,11 +51,20 @@ TRANSITIONS: dict[tuple[Status, EventType], Status] = {
     (Status.GAP_CHECK, EventType.NEEDS_USER): Status.AWAITING_ANSWERS,
     (Status.GAP_CHECK, EventType.SUFFICIENT): Status.SYNTHESIZING,
     (Status.SYNTHESIZING, EventType.REPORT_READY): Status.DONE,
+    (Status.GAP_CHECK, EventType.PLAN_CHANGED): Status.EXECUTING,
+}
+
+# A finished session can be reopened by a user override (e.g. excluding a source from the report):
+# it goes back to EXECUTING, then through the coverage check to a rewritten report. FAILED is final.
+REOPEN: dict[tuple[Status, EventType], Status] = {
+    (Status.DONE, EventType.PLAN_CHANGED): Status.EXECUTING,
 }
 
 
 def next_status(status: Status, event: EventType, mode: Mode) -> Status:
     """Return the status that follows `event` in `status`. Raises InvalidTransition otherwise."""
+    if (status, event) in REOPEN:
+        return REOPEN[(status, event)]
     if status in TERMINAL:
         raise InvalidTransition(f"session is already {status}; got event {event}")
     if event == EventType.FAILED:

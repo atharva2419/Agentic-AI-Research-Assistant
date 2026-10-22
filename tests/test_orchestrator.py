@@ -17,7 +17,8 @@ from app.models import (
     Status,
     SubTaskStatus,
 )
-from app.orchestrator.orchestrator import CommandRejected, Orchestrator
+from app.orchestrator.errors import CommandRejected
+from app.orchestrator.orchestrator import Orchestrator
 from app.orchestrator.steps.cross_check import ContradictionOutput, CrossCheckOutput
 from app.search.fake import FakeSearch
 from tests.helpers import (

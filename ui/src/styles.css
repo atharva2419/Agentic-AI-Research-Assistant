@@ -154,3 +154,18 @@ blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--bor
 .contradiction p { margin: 4px 0; }
 
 .empty { max-width: 640px; }
+
+/* Override controls (Phase 6) */
+button.small { padding: 2px 8px; font-size: 0.8rem; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+.inline-edit { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.inline-edit input { width: auto; min-width: 70px; padding: 4px 8px; }
+.inline-edit input[type="number"] { width: 80px; }
+.task-actions { display: inline-flex; gap: 4px; margin-left: 6px; }
+.add-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.add-search input { flex: 1 1 260px; }
+.add-search select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.check { display: inline-flex; gap: 4px; align-items: center; font-size: 0.85rem; }
+.check input { width: auto; }
+.title-line { flex: 1; }
+.notice { border-color: var(--warn); color: var(--warn); }

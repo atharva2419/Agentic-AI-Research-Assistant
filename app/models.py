@@ -146,9 +146,15 @@ class ResearchPlan(DomainModel):
 # --- Sources and analysis ----------------------------------------------------------------------
 
 
+ExclusionRule = Literal["recency", "content", "domain_cap"]
+
+
 class Exclusion(DomainModel):
     stage: ExclusionStage
     reason: str
+    # Which code rule excluded it (stage=rule only). "recency" exclusions are undone when the
+    # user widens the date window; the others are not.
+    rule: ExclusionRule | None = None
 
 
 class Source(DomainModel):
@@ -356,8 +362,8 @@ class SkipSubtask(DomainModel):
 
 class AddSubtask(DomainModel):
     type: Literal["add_subtask"] = "add_subtask"
-    title: str
-    query: str
+    title: str = ""
+    query: str = Field(min_length=3, max_length=200)
     search_mode: SearchMode = SearchMode.GENERAL
     research_question_ids: list[str] = Field(default_factory=list)
 

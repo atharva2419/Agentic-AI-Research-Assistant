@@ -142,6 +142,8 @@ stateDiagram-v2
     AWAITING_ANSWERS --> GAP_CHECK: gap_answer_received
     GAP_CHECK --> SYNTHESIZING: sufficient / budget exhausted
     SYNTHESIZING --> DONE: report_ready
+    DONE --> EXECUTING: plan_changed (user override reopens)
+    GAP_CHECK --> EXECUTING: plan_changed
     DONE --> [*]
 ```
 
@@ -413,7 +415,18 @@ Excluded sources are **kept in the session**, not deleted, so the UI can show wh
 | Switch mode (autonomous ↔ supervised) | any time | Controls whether the agent waits for plan approval |
 
 Every command is logged with `actor="user"`, so the log is a full audit trail of agent decisions and
-human overrides. **Autonomous mode** runs start to finish with no prompts (answering the assignment's
+human overrides.
+
+**Implementation (`app/orchestrator/overrides.py`):** one small function per command: check the
+state (else `CommandRejected` → HTTP 409), apply, log. Plan edits are allowed in
+`AWAITING_PLAN_APPROVAL`, `EXECUTING`, `GAP_CHECK` and `DONE`, on pending tasks only. A change that
+affects findings (new search, excluded/restored source, window change that moved sources) **reopens**
+a session that is past execution: the `PLAN_CHANGED` event takes `GAP_CHECK` or `DONE` back to
+`EXECUTING`, which runs any new tasks, re-checks coverage and rewrites the report. `FAILED` stays
+final. Exclusions record which rule caused them, so widening the window restores only date-excluded
+sources (marked "not relevance-checked"); restored sources without a summary get a summarize task.
+The gap check also refuses to judge coverage while tasks are pending, so work added while the agent
+waited on a question is never skipped. **Autonomous mode** runs start to finish with no prompts (answering the assignment's
 "without ongoing user prompts"); **supervised mode** pauses for plan approval. Both use the same code.
 
 ## 10. API and live updates

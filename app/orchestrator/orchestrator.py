@@ -11,11 +11,19 @@ from collections.abc import Awaitable, Callable
 from app.llm.base import LLMError, StructuredOutputError
 from app.models import (
     Actor,
+    AddSubtask,
     AnswerQuestions,
     ApprovePlan,
+    EditPlan,
+    ExcludeSource,
+    IncludeSource,
+    Mode,
     Pause,
     ResearchSession,
     Resume,
+    SetMode,
+    SetRecency,
+    SkipSubtask,
     Status,
     SubTask,
     SubTaskStatus,
@@ -23,8 +31,10 @@ from app.models import (
     UserCommand,
     utc_now,
 )
+from app.orchestrator import overrides
 from app.orchestrator.budget import skip_searches_over_cost_cap
 from app.orchestrator.deps import AgentDeps
+from app.orchestrator.errors import CommandRejected
 from app.orchestrator.scheduler import all_finished, ready_tasks
 from app.orchestrator.state_machine import EventType, InvalidTransition, is_runnable, next_status
 from app.orchestrator.steps.clarify import run_clarify
@@ -41,10 +51,6 @@ from app.orchestrator.steps.summarize import run_summarize
 from app.orchestrator.steps.synthesize import run_synthesize
 
 Handler = Callable[[ResearchSession], Awaitable[EventType]]
-
-
-class CommandRejected(Exception):
-    """A user command that doesn't make sense in the session's current state."""
 
 
 class Orchestrator:
@@ -109,9 +115,54 @@ class Orchestrator:
             case Resume():
                 session.paused = False
                 self._log_user(session, "resumed the session")
-            case _:
-                raise CommandRejected(f"command '{command.type}' is not supported yet")
+            case SetMode():
+                self._set_mode(session, command)
+            case EditPlan():
+                self._after_override(session, overrides.edit_plan(session, command))
+            case SkipSubtask():
+                self._after_override(session, overrides.skip_subtask(session, command))
+            case AddSubtask():
+                result = overrides.add_subtask(session, command, self.deps.blueprint)
+                self._after_override(session, result)
+            case ExcludeSource():
+                self._after_override(session, overrides.exclude_source(session, command))
+            case IncludeSource():
+                result = overrides.include_source(session, command, self.deps.blueprint)
+                self._after_override(session, result)
+            case SetRecency():
+                result = overrides.set_recency(
+                    session, command, self.deps.blueprint, self.deps.today()
+                )
+                self._after_override(session, result)
         session.updated_at = utc_now()
+
+    def _after_override(self, session: ResearchSession, result: overrides.OverrideResult) -> None:
+        """If the change touches finished work, go back and redo what depends on it: new tasks
+        run, coverage is re-checked, and the report is rewritten."""
+        if result.affects_findings and session.status in {Status.GAP_CHECK, Status.DONE}:
+            self._transition(session, EventType.PLAN_CHANGED)
+
+    def _set_mode(self, session: ResearchSession, command: SetMode) -> None:
+        if command.mode == session.mode:
+            raise CommandRejected(f"the session is already in {command.mode} mode")
+        session.mode = command.mode
+        self._log_user(session, f"switched to {command.mode} mode")
+        if command.mode != Mode.AUTONOMOUS:
+            return
+        # Autonomous means "don't wait for me": release whatever the agent is waiting on.
+        if session.status == Status.AWAITING_PLAN_APPROVAL:
+            session.add_log(
+                actor=Actor.AGENT,
+                step="plan",
+                action="approved the plan automatically",
+                reason="autonomous mode: the user is not reviewing plans",
+            )
+            self._transition(session, EventType.PLAN_APPROVED)
+        elif session.status == Status.AWAITING_ANSWERS:
+            from_gap_check = any(q.origin == "gap_check" for q in session.pending_questions())
+            auto_resolve_if_autonomous(session)
+            event = EventType.GAP_ANSWER_RECEIVED if from_gap_check else EventType.ANSWERS_RECEIVED
+            self._transition(session, event)
 
     def _answer_questions(self, session: ResearchSession, command: AnswerQuestions) -> None:
         """Record answers; a None answer, or a question left out, counts as skipped."""
@@ -197,6 +248,17 @@ class Orchestrator:
             )
 
     async def _gap_check(self, session: ResearchSession) -> EventType:
+        assert session.plan is not None
+        if not all_finished(session.plan):
+            # The user added work (e.g. a search, or a summary for a restored source) while the
+            # agent was waiting; run it before judging coverage.
+            session.add_log(
+                actor=Actor.SYSTEM,
+                step="gap_check",
+                action="new sub-tasks are pending",
+                decision="running them before reviewing coverage",
+            )
+            return EventType.PLAN_CHANGED
         decision = await run_gap_check(self.deps, session)
         if decision.verdict == "replan":
             return EventType.REPLAN

@@ -117,6 +117,38 @@ def test_pause_stops_the_runner_and_resume_finishes(client: TestClient) -> None:
     assert wait_for(client, session_id, status_is("done"))["status"] == "done"
 
 
+def test_excluding_a_source_after_done_reopens_and_rewrites(client: TestClient) -> None:
+    created = client.post("/api/sessions", json={"topic": "heat pumps", "mode": "autonomous"})
+    session_id = created.json()["id"]
+    done = wait_for(client, session_id, status_is("done"))
+    first_report_log = sum(e["step"] == "synthesize" for e in done["log"])
+    cited = done["report"]["key_takeaways"][0]["source_ids"][0]
+
+    exclude = {"type": "exclude_source", "source_id": cited, "reason": "unreliable"}
+    response = client.post(f"/api/sessions/{session_id}/commands", json=exclude)
+    assert response.status_code == 200
+    assert response.json()["status"] == "executing"  # reopened; the runner restarts
+
+    session = wait_for(
+        client,
+        session_id,
+        lambda s: (
+            s["status"] == "done"
+            and sum(e["step"] == "synthesize" for e in s["log"]) > first_report_log
+        ),
+    )
+    cited_now = {sid for t in session["report"]["key_takeaways"] for sid in t["source_ids"]}
+    assert cited not in cited_now
+
+
+def test_override_that_does_not_fit_is_409(client: TestClient) -> None:
+    session_id = client.post("/api/sessions", json={"topic": "AI in journalism"}).json()["id"]
+    wait_for(client, session_id, status_is("awaiting_answers"))
+    skip = {"type": "skip_subtask", "subtask_id": "t1"}
+    response = client.post(f"/api/sessions/{session_id}/commands", json=skip)
+    assert response.status_code == 409
+
+
 def test_event_stream_starts_with_a_snapshot(client: TestClient) -> None:
     session_id = client.post("/api/sessions", json={"topic": "AI in journalism"}).json()["id"]
     wait_for(client, session_id, status_is("awaiting_answers"))
