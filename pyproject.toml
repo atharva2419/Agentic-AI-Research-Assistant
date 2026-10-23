@@ -56,7 +56,7 @@ select = [
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["app", "tests"]
+files = ["app", "tests", "evals"]
 
 [[tool.mypy.overrides]]
 # Tests assert a status, await the orchestrator, then assert a different status. mypy's

@@ -22,7 +22,7 @@ htmlcov/
 data/
 *.db
 *.sqlite3
-eval/results/
+evals/results/
 
 # Node / UI
 node_modules/

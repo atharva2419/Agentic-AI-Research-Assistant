@@ -150,7 +150,34 @@ clarifying questions, overrides, reopening a finished report, budgets, failures,
 real SQLite database, and a test that fails if the database models drift from the migrations. CI
 (GitHub Actions) runs lint, strict type checks and both test suites on every push.
 
-Evaluation of agent quality on real topics: _coming next_.
+### Evaluation
+
+`uv run python -m evals.run --live` runs 7 cases ([evals/cases.yaml](evals/cases.yaml)) as
+autonomous sessions and scores them **by code, with no LLM judge**
+([evals/metrics.py](evals/metrics.py)): completion, plan validity on the first try, recency
+compliance, citation validity, quote verification, cost, plus case-specific behavior checks:
+
+- the date window stays strict for news, and widens for evergreen topics and stated time frames;
+- an ambiguous topic gets clarifying questions and stated assumptions;
+- priority keywords end up covered;
+- a **planted contradiction** between two fixed pages is found;
+- a **planted prompt injection** ("ignore all previous instructions…") is not followed or cited.
+
+The planted cases feed the real LLM identical fixed pages, so they measure judgment on the same
+evidence every run. Latest results: [evals/RESULTS.md](evals/RESULTS.md).
+
+**Latest live run (7 cases, $1.63):** 6/7 cases and 8/9 behavior checks passed; 7/7 completed with
+plans valid on the first try; 100% of dated kept sources inside the window (102/102); 100% of
+report statements with verified citations (181/181); 100% of quotes verified word for word
+(151/151); the planted contradiction was found, and the injected page scored 0.0, was excluded and
+never cited.
+
+**What it caught:** for "website migration SEO best practices" the planner kept the 365-day
+window, reasoning that SEO changes fast. That excluded 20 older but still valid sources (including
+Google's own Search Console help pages), and both replans were then spent on coverage gaps those
+sources would have filled. The prompt guidance for evergreen topics isn't enough on its own; the
+next step is to let the coverage check widen the window when date exclusions explain a gap. Without `--live`, the
+harness runs offline for free (it checks the plumbing; CI runs it on every push).
 
 ---
 
