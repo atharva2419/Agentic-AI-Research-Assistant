@@ -11,6 +11,11 @@ window, pause. Finished research is **remembered per user** and used to suggest 
 
 > Design document with the full architecture and decision log: [docs/design.md](docs/design.md)
 
+![A finished session: the research plan (v3, after two replans) on the left, the cited report on the right](docs/images/FinalReport.png)
+
+*A finished live session: the plan and its sub-tasks on the left (v3: the agent replanned twice),
+the cited report on the right. Each citation chip opens its source beside the report.*
+
 ---
 
 ## Features
@@ -51,7 +56,8 @@ OFFLINE_MODE=true docker compose up --build     # offline demo mode, no keys
 ```
 
 The image builds the UI, runs as a non-root user and has a health check; sessions, memory and
-exported reports are kept on a named volume (`/data`).
+exported reports are kept on a named volume (`/data`). If port 8000 is taken, set `APP_PORT`
+(e.g. `APP_PORT=8080 docker compose up`; in PowerShell: `$env:APP_PORT="8080"; docker compose up`).
 
 **No keys? Offline demo mode:** set `OFFLINE_MODE=true` (in `.env` or the environment). A built-in
 fake LLM and fake search produce valid output for any topic, so every feature can be tried for free.
@@ -79,15 +85,27 @@ reports are also exported to `data/reports/`.
 2. **Steer.** Answer one, skip one. The skipped one appears under *Working assumptions*.
 3. **Review the plan.** Research questions and sub-tasks appear, with the planner's reasoning.
    Edit a query, skip a task or add a search, then **Approve and start**.
+
+   ![The research plan waiting for approval, with Edit and Skip on each pending task](docs/images/PendingForApproval.png)
+
 4. **Watch.** The action log streams every decision: searches, sources excluded as outdated or
    irrelevant (with reasons), summaries, contradictions, the coverage check and any replan. The
-   right-hand column shows live progress until the report is ready.
+   right-hand column shows live progress until the report is ready. Nothing is hidden: the
+   Sources tab lists every excluded source with the rule or relevance judgment that excluded it,
+   and any of them can be re-included.
+
+   ![Excluded sources, each with its reason: outdated, too little content, or low relevance](docs/images/ExcludedResources.png)
 5. **Read and verify.** The report appears on the right. Hover a citation to see its source; click
    it to open the source beside the report, with its summary and verified quotes.
 6. **Override.** Exclude a source the report relies on (say, a vendor blog). The agent reopens the
    session, re-checks coverage and rewrites the report without it. Or tighten the date window.
 7. **Come back later.** Start a related topic: the form previews your earlier research, the agent
    recalls it as context for planning, and the sidebar suggests next topics from past reports.
+   It also shows what the agent remembers, when each memory expires, and a **Forget** button.
+
+   <img src="docs/images/Memory.png" alt="Suggested next topics, what the agent remembers (with expiry and Forget), and past sessions" width="240">
+
+
 
 ---
 

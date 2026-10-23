@@ -1,10 +1,11 @@
 # docker compose up --build                      live mode (needs keys in .env)
 # OFFLINE_MODE=true docker compose up --build    offline demo mode, no keys needed
+# APP_PORT=8080 docker compose up --build        if port 8000 is already taken
 services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     env_file:
       - path: .env
         required: false # offline mode works without it
