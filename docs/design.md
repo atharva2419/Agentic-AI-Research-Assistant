@@ -1,6 +1,7 @@
 # Design: Agentic AI Personal Research Assistant
 
-Status: **draft for review** (Phase 1). Owner: Atharva Deshpande. Last updated: 2026-10-20.
+Status: **implemented** (all phases). Owner: Atharva Deshpande. Last updated: 2026-10-23.
+Written before the code as the plan, then kept in step with every change made during the build.
 
 This document is the source of truth for how the system works and why. Read sections 1–4 for the big
 picture; the rest is reference for each part.
@@ -78,10 +79,12 @@ app/
     orchestrator.py         Orchestrator.step() / handle_command(): runs one unit of work
     plan_validation.py      Checks the plan is a valid graph (section 5.2)
     scheduler.py            Picks which sub-tasks are ready to run
-    steps/                  One module per step: clarify, plan, search, relevance, summarize,
-                            cross_check, gap_check, synthesize
+    steps/                  One module per step: clarify, plan, search (+ relevance), summarize,
+                            cross_check, gap_check, synthesize; questions.py, common.py
+    overrides.py            Human override commands (check state, apply, log)
     citations.py            Citation + quote validators
-    budget.py               Budget tracking and limits
+    budget.py               Cost cap
+    deps.py, errors.py      Injected dependencies; CommandRejected
   llm/
     base.py                 LLMClient protocol + structured_call() helper with retries
     anthropic_client.py     Real client (official anthropic SDK)
@@ -90,16 +93,20 @@ app/
     base.py                 SearchClient protocol
     tavily_client.py        Real client (httpx → Tavily REST)
     fake.py                 Fixture-based fake for tests
-  filtering.py              Code rules: dedupe, recency, empty content
-  memory/                   MemoryStore + TF-IDF similarity
-  storage/                  SQLAlchemy tables + repositories (in-memory repo for tests)
+  filtering.py              Code rules: dedupe, recency, thin content, domain cap
+  keywords.py               Priority keywords: normalize, measure coverage
+  memory/                   TF-IDF retrieval, memory stores, MemoryService
+  storage/                  SQLAlchemy tables, session stores (SQL + in-memory), Alembic runner
   api/                      FastAPI routes, SSE, SessionRunner, event bus
+  demo/                     Offline LLM and search (no keys)
+  wiring.py, exports.py     Build real/offline deps; write sessions and reports to data/
   cli.py                    `python -m app.cli "topic"`
 blueprints/research.yaml
 prompts/*.md
 migrations/                 Alembic
 ui/                         React + TypeScript (Vite)
-eval/                       Eval topics + runner
+evals/                      Eval cases, planted pages, scoring, runner, RESULTS.md
+Dockerfile, docker-compose.yml
 tests/
 ```
 
@@ -432,20 +439,27 @@ a session that is past execution: the `PLAN_CHANGED` event takes `GAP_CHECK` or 
 final. Exclusions record which rule caused them, so widening the window restores only date-excluded
 sources (marked "not relevance-checked"); restored sources without a summary get a summarize task.
 The gap check also refuses to judge coverage while tasks are pending, so work added while the agent
-waited on a question is never skipped. **Autonomous mode** runs start to finish with no prompts (answering the assignment's
-"without ongoing user prompts"); **supervised mode** pauses for plan approval. Both use the same code.
+waited on a question is never skipped.
+
+**Autonomous mode** runs start to finish with no prompts (answering the assignment's "without
+ongoing user prompts"); **supervised mode** pauses for plan approval. Both use the same code.
 
 ## 10. API and live updates
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/sessions` | Start a session `{topic, user_id, mode, recency_days}` |
+| POST | `/api/sessions` | Start a session `{topic, user_id, mode, recency_days, keywords}` |
 | GET | `/api/sessions?user_id=` | List past sessions |
-| GET | `/api/sessions/{id}` | Full session state |
-| GET | `/api/sessions/{id}/events` | **SSE** stream: replays past events, then live |
-| POST | `/api/sessions/{id}/commands` | Any `UserCommand` (answer, approve, exclude, pause, …) |
-| GET | `/api/users/{user_id}/suggestions` | Related topics from memory |
-| GET | `/api/blueprint` | The active blueprint (shown in the UI's "How it works" panel) |
+| GET | `/api/sessions/{id}` | Full session state (without page text) |
+| DELETE | `/api/sessions/{id}` | Delete a session, its report and its memory |
+| GET | `/api/sessions/{id}/events` | **SSE** stream: a snapshot, then live log and snapshot events |
+| POST | `/api/sessions/{id}/commands` | Any `UserCommand` (answer, approve, overrides, pause, …) |
+| GET | `/api/sessions/{id}/report.md` | Report as Markdown (download) |
+| GET | `/api/users/{user_id}/memory` | What the agent remembers (with expiry) |
+| DELETE | `/api/users/{user_id}/memory/{item_id}` | Forget one memory |
+| GET | `/api/users/{user_id}/related?topic=` | Related past research, previewed while typing |
+| GET | `/api/users/{user_id}/suggestions` | Suggested next topics from past reports |
+| GET | `/api/health`, `/api/blueprint` | Status (incl. offline mode); the active blueprint |
 
 Also: `GET /api/health` (reports offline mode) and `GET /api/sessions/{id}/report.md` (download).
 
@@ -539,20 +553,26 @@ synonyms aren't counted; the prompts still treat the keyword's meaning.
 Plus: untrusted-content wrapping, no tools for the LLM, citation and quote validation, and every
 exclusion with a visible reason.
 
-## 13. Evaluation (Phase 8)
+## 13. Evaluation
 
-`eval/topics.yaml` holds 6–8 topics (some ambiguous, some time-sensitive, one with a **seeded
-contradiction** where the fake search returns two fixed sources that disagree). `python -m eval.run`
-runs each in autonomous mode and reports:
+`evals/cases.yaml` holds 7 cases, each with its own expectations: a news topic (window kept), an
+evergreen topic (window widened), a stated time frame (window covers it), an ambiguous topic
+(questions + assumptions), priority keywords (covered), a **planted contradiction** and a **planted
+prompt injection** (fixed fake pages fed to the real LLM, so the evidence is identical every run).
+`python -m evals.run [--live]` runs each in autonomous mode and scores it **by code only**
+(`evals/metrics.py`, no LLM judge):
 
-- **Plan validity:** did the plan pass validation on the first try?
-- **Recency compliance:** % of kept sources inside the window (should be 100%; unknown dates reported separately).
-- **Citation validity:** % of report statements with valid citations; count of unsupported statements.
-- **Contradiction recall:** was the seeded contradiction found?
-- **Cost and latency** per run.
+- completion; plan valid on the first try;
+- recency compliance (% of dated kept sources inside the window; undated reported separately);
+- citation validity (% of report statements with verified citations);
+- quote verification (verified vs removed);
+- the case's behavior checks; cost, calls, searches and time.
 
-The runner can use the fake LLM (free, checks the plumbing) or the real one (checks quality), and writes
-JSON plus a printed table.
+Offline mode (free) checks the harness and runs in CI. The live run's summary is committed as
+`evals/RESULTS.md`. First live run: 6/7 cases, 8/9 checks, 102/102 kept sources in window, 181/181
+cited statements verified, 151/151 quotes verified, contradiction found, injection excluded at
+relevance 0.0; the failure (the planner kept the window for an evergreen SEO topic) is documented
+with its next step.
 
 ## 14. Testing strategy
 
@@ -563,8 +583,10 @@ JSON plus a printed table.
   `FakeSearch` (fixtures): happy path, clarify → skip → assumption, supervised approval, replan, gap
   question, budget exhausted, user overrides mid-run, LLM failure.
 - **API:** FastAPI `TestClient` for routes and the SSE stream.
-- **UI:** Vitest (Jest-compatible API, native to Vite) for key components; one Playwright end-to-end
-  run against the backend in fake mode if time allows.
+- **UI:** Vitest (Jest-compatible API, native to Vite) for key components. (A Playwright end-to-end
+  test was planned "if time allows" and not built; the API tests drive full sessions over HTTP.)
+- **Storage:** migrations applied to a fresh SQLite file; a drift test fails if the ORM models and
+  the migrations disagree; a real restart test (two app instances on one database).
 - The whole Python suite runs in seconds with **no API keys**.
 - **CI (GitHub Actions):** ruff, mypy (strict), pytest; UI type-check, tests, build.
 
@@ -580,10 +602,23 @@ JSON plus a printed table.
 | D6 | Recency filtering in code, not in the search API | Tavily date filter | Every exclusion visible and testable; window can change without searching again |
 | D7 | Pause is a flag | Pause state | Resume needs no "where was I" logic |
 | D8 | SSE + REST commands | WebSockets | One-way stream is all we need; simpler, auto-reconnect |
-| D9 | Session as JSON document + log/memory tables | Fully normalized schema | Less code; queried parts are still relational; JSONB-ready |
+| D9 | Session as JSON document + memory table | Fully normalized schema; separate action-log table | Less code; queried columns are real columns; JSONB-ready. The audit table is the upgrade path |
 | D10 | TF-IDF memory retrieval behind an interface | Embeddings + vector DB | No second provider for a small corpus; clear upgrade path |
 | D11 | Autonomous vs supervised mode | Always ask / never ask | Meets "no ongoing prompts" and "human oversight" with one code path |
 | D12 | Single-process runner | Task queue + workers | Enough for a demo; production path documented |
+
+Decisions added during the build (each prompted by a test failure or a live run):
+
+| # | Decision | Why |
+|---|---|---|
+| D13 | Layered dependencies (search ← summarize ← cross_check) instead of cycle detection | Cycles become impossible by construction; less code to explain |
+| D14 | Summary budget shared fairly across tasks, best source of each search first, with a reserve for replans | First live run: first-come-first-served starved the last research questions of 0.9-relevance sources |
+| D15 | The planner may widen (never narrow) the date window, with a reason | Second live run: the user asked for "since Nov 2022" but a 365-day default excluded 17 key sources |
+| D16 | User overrides reopen a finished report (`PLAN_CHANGED`: DONE → EXECUTING) | Excluding a source should change the report, not just a flag; FAILED stays final |
+| D17 | Snapshot-on-connect SSE (two event types) | Reconnects need no replay buffer or event IDs |
+| D18 | Interrupted sessions resume paused after a restart | A restart must never spend API credits unasked |
+| D19 | Priority keywords guide prompts; code measures coverage; never a filter | "Prioritise" becomes observable without excluding evidence |
+| D20 | Code-only eval scoring with planted cases | Auditable numbers; identical evidence for the real LLM every run |
 
 ## 16. Cost estimate
 
@@ -598,29 +633,28 @@ One full session (~12 searches, ~15 sources summarized), roughly:
 | Relevance + summaries (Haiku) | ~20 | ~$0.01–0.02 |
 | **Total** | | **~$0.12–0.20** |
 
-**$5 ≈ 25–40 full live runs.** Plan: build and test entirely with fakes (free); use
-`LLM_MODEL_OVERRIDE=claude-haiku-5-5` for smoke tests (~$0.01–0.02 each); save full Opus runs for
-prompt tuning, the eval (~$1.5 for 6–8 topics) and demo rehearsal. The real cost of each session is
-logged, so these estimates get replaced with measured numbers.
+**Measured:** live sessions cost $0.20–0.35 (the higher end with two replans); the 7-case live
+eval cost $1.63 in total. Development and the test suite use fakes, at no cost.
 
-## 17. Schedule (deadline Fri 2026-10-23, 5 pm ET)
+## 17. Delivery
 
-| Day | Phases |
-|---|---|
-| Tue 20 | 1 Design (this doc) · 2 Skeleton · start 3 Orchestrator core |
-| Wed 21 | 3 Orchestrator core + CLI demo · 4 Adaptivity |
-| Thu 22 | 5 API + React UI · 6 Oversight controls · 7 Memory + Alembic |
-| Fri 23 (AM) | 8 Eval · 9 README, Docker, demo rehearsal. Submit by early afternoon with buffer |
+Built in phases, each reviewed before the next: design → skeleton → orchestrator core (CLI) →
+adaptivity → API + live UI → human overrides → persistence and memory → evaluation → packaging.
+Three live runs during the build each exposed a real issue that was fixed with a regression test
+(D14, D15, and the evergreen-window prompt). Not built: a Playwright end-to-end test, authentication,
+an LLM-judge eval, and gap-check-driven window widening (the documented next step).
 
-If time runs short, cut in this order: Playwright E2E → Docker → eval LLM-judge extras. Never cut tests
-or the README.
+**Packaging:** a multi-stage `Dockerfile` (Node builds the UI, then a slim Python image with uv,
+non-root user, health check) and `docker-compose.yml` with a named volume for `/data` (database and
+exported reports).
 
-## 18. New dependencies (for approval)
+## 18. Dependencies
 
 **Python runtime:** `fastapi`, `uvicorn[standard]`, `pydantic` (v2), `pydantic-settings`, `anthropic`,
-`httpx`, `pyyaml`, `sqlalchemy`, `alembic`, `sse-starlette` (SSE responses), `rich` (readable CLI output).
+`httpx`, `pyyaml`, `sqlalchemy`, `alembic`, `rich` (CLI output). SSE is written by hand (about 10
+lines), so `sse-starlette` was not needed.
 
 **Python dev:** `pytest`, `pytest-asyncio`, `ruff`, `mypy`, `types-PyYAML`, `pre-commit`.
 
-**UI:** `react`, `react-dom`, `typescript`, `vite`, `vitest`, `@testing-library/react`; plain CSS (no UI
-framework) to keep it small; `@playwright/test` only if time allows.
+**UI:** `react`, `react-dom`, `typescript`, `vite`, `vitest`, `@testing-library/react`, `jsdom`; plain
+CSS (no UI framework).

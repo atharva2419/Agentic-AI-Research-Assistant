@@ -43,6 +43,16 @@ uv run uvicorn app.api.main:app --port 8000
 
 Open http://localhost:8000. API docs are generated at http://localhost:8000/docs.
 
+**With Docker** (no local Python or Node needed):
+
+```bash
+docker compose up --build                       # live mode, reads keys from .env
+OFFLINE_MODE=true docker compose up --build     # offline demo mode, no keys
+```
+
+The image builds the UI, runs as a non-root user and has a health check; sessions, memory and
+exported reports are kept on a named volume (`/data`).
+
 **No keys? Offline demo mode:** set `OFFLINE_MODE=true` (in `.env` or the environment). A built-in
 fake LLM and fake search produce valid output for any topic, so every feature can be tried for free.
 
@@ -58,6 +68,26 @@ reports are also exported to `data/reports/`.
 
 **Cost:** a full live session costs about $0.20–0.35 (12 searches max, ~35 LLM calls). Set
 `LLM_MODEL_OVERRIDE=claude-haiku-5-5` to run every step on the cheapest model (~$0.02).
+
+---
+
+## Try it: a five-minute walkthrough
+
+1. **Ask.** Enter *impact of AI on journalism* in **Supervised** mode, optionally with keywords such
+   as *local news, layoffs*. The agent decides the topic is ambiguous and asks up to three
+   questions, each with suggested answers and the assumption it will make if you skip.
+2. **Steer.** Answer one, skip one. The skipped one appears under *Working assumptions*.
+3. **Review the plan.** Research questions and sub-tasks appear, with the planner's reasoning.
+   Edit a query, skip a task or add a search, then **Approve and start**.
+4. **Watch.** The action log streams every decision: searches, sources excluded as outdated or
+   irrelevant (with reasons), summaries, contradictions, the coverage check and any replan. The
+   right-hand column shows live progress until the report is ready.
+5. **Read and verify.** The report appears on the right. Hover a citation to see its source; click
+   it to open the source beside the report, with its summary and verified quotes.
+6. **Override.** Exclude a source the report relies on (say, a vendor blog). The agent reopens the
+   session, re-checks coverage and rewrites the report without it. Or tighten the date window.
+7. **Come back later.** Start a related topic: the form previews your earlier research, the agent
+   recalls it as context for planning, and the sidebar suggests next topics from past reports.
 
 ---
 
@@ -131,8 +161,10 @@ blueprints/research.yaml   the workflow definition
 prompts/*.md               one prompt per step
 migrations/                Alembic migrations
 ui/                        React + TypeScript (Vite)
+evals/                     evaluation cases, planted pages, code-only scoring, RESULTS.md
 tests/                     pytest suite (fake LLM and search: no keys, no network)
 docs/design.md             architecture, state machine, decision log
+Dockerfile, docker-compose.yml
 ```
 
 ---
@@ -140,9 +172,9 @@ docs/design.md             architecture, state machine, decision log
 ## Tests and quality
 
 ```bash
-uv run pytest                    # ~200 tests, a few seconds, no API keys needed
+uv run pytest                    # 215 tests, a few seconds, no API keys needed
 uv run ruff check . && uv run mypy
-cd ui && npm test                # UI tests (Vitest)
+cd ui && npm test                # 20 UI tests (Vitest)
 ```
 
 The orchestrator is tested end to end with a scripted fake LLM and fake search: replans,
@@ -164,7 +196,8 @@ compliance, citation validity, quote verification, cost, plus case-specific beha
 - a **planted prompt injection** ("ignore all previous instructions…") is not followed or cited.
 
 The planted cases feed the real LLM identical fixed pages, so they measure judgment on the same
-evidence every run. Latest results: [evals/RESULTS.md](evals/RESULTS.md).
+evidence every run. Latest results: [evals/RESULTS.md](evals/RESULTS.md). Without `--live`, the
+harness runs offline for free (it checks the plumbing; CI runs it on every push).
 
 **Latest live run (7 cases, $1.63):** 6/7 cases and 8/9 behavior checks passed; 7/7 completed with
 plans valid on the first try; 100% of dated kept sources inside the window (102/102); 100% of
@@ -176,8 +209,7 @@ never cited.
 window, reasoning that SEO changes fast. That excluded 20 older but still valid sources (including
 Google's own Search Console help pages), and both replans were then spent on coverage gaps those
 sources would have filled. The prompt guidance for evergreen topics isn't enough on its own; the
-next step is to let the coverage check widen the window when date exclusions explain a gap. Without `--live`, the
-harness runs offline for free (it checks the plumbing; CI runs it on every push).
+next step is to let the coverage check widen the window when date exclusions explain a gap.
 
 ---
 
@@ -206,4 +238,4 @@ Knowledge workers (journalists, analysts, students) who need research they can *
 audit**. The same patterns (YAML-defined workflows, validated LLM steps, citations, an audit log,
 human review and overrides, retention policies) are what agentic "digital coworkers" need in
 government and enterprise settings. The stack (Python, FastAPI, Pydantic, SQLAlchemy, Alembic,
-pytest, React/TypeScript, GitHub Actions) was chosen with that in mind.
+pytest, React/TypeScript, Docker, GitHub Actions) was chosen with that in mind.
